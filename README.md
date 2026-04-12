@@ -24,6 +24,8 @@ There's no unit test for LLM quality. Teams ship prompt changes, swap models, or
 | `check_thresholds` | Validate evaluation results against quality gates (faithfulness, relevance, TTFT, cost) |
 | `list_evaluations` | List past evaluation runs with metadata (timestamp, models, cost, pass/fail) |
 | `get_evaluation` | Retrieve full details of a specific run (per-question scores, responses, judge reasoning) |
+| `compare_runs` | Compare two evaluation runs and detect regressions beyond configurable tolerance |
+| `format_pr_comment` | Generate a markdown PR comment from evaluation results with regression details and threshold status |
 
 ### What it measures
 
@@ -219,16 +221,55 @@ Required fields: `id`, `category`, `context`, `question`, `expected_response`. T
 
 ## Usage modes
 
-### MCP agent (v0.1.0)
+### MCP agent
 
-Connect to Claude Desktop or any MCP-compatible agent. The agent calls tools directly — run evals, check thresholds, browse past runs.
+Connect to Claude Desktop or any MCP-compatible agent. The agent calls tools directly — run evals, check thresholds, browse past runs, compare runs, and generate PR comments.
 
-### CLI in GitHub Actions (coming in v0.2.0)
+### CLI
+
+The same `mcp-llm-eval` binary doubles as a CLI for CI/CD pipelines:
+
+```bash
+# Run a full evaluation
+mcp-llm-eval run --config .eval-gate.yml --dataset eval/dataset.json --output-dir eval/results
+
+# Check thresholds (exit code 1 on failure — blocks PRs)
+mcp-llm-eval check --results eval/results/latest_summary.json --config .eval-gate.yml
+
+# Compare against baseline (exit code 1 on regression)
+mcp-llm-eval compare --baseline eval/results/main_summary.json --current eval/results/pr_summary.json
+
+# Generate PR comment markdown
+mcp-llm-eval comment --summary eval/results/latest_summary.json --config .eval-gate.yml --output pr-comment.md
+```
+
+### GitHub Actions
 
 ```yaml
-# .github/workflows/eval-gate.yml (coming soon)
-- name: Run LLM eval gate
-  run: mcp-llm-eval check --config .eval-gate.yml --dataset eval/dataset.json
+name: LLM Eval Gate
+
+on:
+  pull_request:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install mcp-llm-eval anthropic openai
+      - run: mcp-llm-eval run --config .eval-gate.yml --dataset eval/dataset.json --output-dir eval/results
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - run: mcp-llm-eval check --results eval/results/latest_summary.json --config .eval-gate.yml
+      - run: |
+          mcp-llm-eval comment --summary eval/results/latest_summary.json --config .eval-gate.yml --output pr-comment.md
+          gh pr comment ${{ github.event.number }} --body-file pr-comment.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ---

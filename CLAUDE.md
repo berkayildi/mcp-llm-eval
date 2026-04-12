@@ -17,8 +17,12 @@ mcp-llm-eval/
 ├── src/
 │   └── mcp_llm_eval/
 │       ├── __init__.py          # Package version (__version__ = "0.1.0")
-│       ├── server.py            # MCP server + tool registration (4 tools)
+│       ├── server.py            # MCP server + tool registration (6 tools) + entry point routing
 │       ├── engine.py            # Eval engine: dataset loader, LLM runner, judge, threshold checker
+│       ├── cli.py               # CLI argument parsing and subcommand routing (run, check, compare, comment)
+│       ├── config.py            # .eval-gate.yml loader and validator
+│       ├── comparison.py        # compare_runs logic: regression detection with tolerance
+│       ├── formatter.py         # PR comment markdown generator
 │       ├── providers/
 │       │   ├── __init__.py
 │       │   ├── anthropic.py     # Streaming runner for Anthropic (messages.stream, TTFT capture)
@@ -30,11 +34,15 @@ mcp-llm-eval/
 │   ├── __init__.py
 │   ├── fixtures/
 │   │   └── sample_dataset.json  # 3 sample eval entries (one per category: factual, reasoning, summarization)
-│   ├── test_server.py           # MCP tool integration tests
+│   ├── test_server.py           # MCP tool integration tests (6 tools)
 │   ├── test_engine.py           # Eval engine unit tests
 │   ├── test_providers.py        # Provider runner tests (mock API calls)
 │   ├── test_judge.py            # Judge scoring tests (mock OpenAI)
-│   └── test_types.py            # Type validation tests
+│   ├── test_types.py            # Type validation tests
+│   ├── test_cli.py              # CLI argument parsing, subcommand routing, exit codes
+│   ├── test_config.py           # YAML loading, validation, defaults, error handling
+│   ├── test_comparison.py       # Regression detection, tolerance math, edge cases
+│   └── test_formatter.py        # Markdown generation, with/without comparison and thresholds
 ├── pyproject.toml               # Build config (hatchling), deps, pytest settings
 ├── Makefile                     # setup / build / start / test / clean
 ├── README.md                    # User-facing docs
@@ -74,6 +82,29 @@ mcp-llm-eval/
 | `check_thresholds` | `results_path: str`, `thresholds: object` | JSON with pass/fail per metric, overall gate status |
 | `list_evaluations` | `results_dir: str` | JSON array of past runs with metadata |
 | `get_evaluation` | `results_path: str` | Full JSON of a specific evaluation run |
+| `compare_runs` | `baseline_path: str`, `current_path: str` | JSON with per-model metric deltas and regression flags |
+| `format_pr_comment` | `summary_path: str` | Markdown string ready to post as a GitHub PR comment |
+
+---
+
+## CLI subcommands
+
+The `mcp-llm-eval` entry point routes based on CLI arguments:
+- No args → starts MCP stdio server (unchanged from v0.1.0)
+- `run` → run full evaluation using .eval-gate.yml config
+- `check` → check thresholds (exit 1 on failure, blocks PRs in CI)
+- `compare` → compare two runs for regressions (exit 1 if found)
+- `comment` → generate markdown PR comment
+
+---
+
+## Adding a new CLI subcommand
+
+1. Add a subparser in `cli.py` `cli_main()` with `subparsers.add_parser("name", ...)`.
+2. Add arguments to the subparser.
+3. Add routing in the `if args.command == "name":` block.
+4. Implement `_cmd_name(args)` function. Use `sys.exit(1)` for failure, `sys.exit(0)` for success.
+5. Add tests in `tests/test_cli.py` that call `cli_main(["name", ...])` and assert exit codes.
 
 ---
 

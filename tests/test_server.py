@@ -9,6 +9,8 @@ import pytest
 
 from mcp_llm_eval.server import (
     _check_thresholds,
+    _compare_runs,
+    _format_pr_comment,
     _get_evaluation,
     _list_evaluations,
     _run_evaluation,
@@ -27,14 +29,17 @@ SAMPLE_DATASET = FIXTURES_DIR / "sample_dataset.json"
 
 
 class TestToolRegistration:
-    async def test_list_tools_returns_four(self):
+    async def test_list_tools_returns_six(self):
         tools = await list_tools()
-        assert len(tools) == 4
+        assert len(tools) == 6
 
     async def test_tool_names(self):
         tools = await list_tools()
         names = {t.name for t in tools}
-        assert names == {"run_evaluation", "check_thresholds", "list_evaluations", "get_evaluation"}
+        assert names == {
+            "run_evaluation", "check_thresholds", "list_evaluations",
+            "get_evaluation", "compare_runs", "format_pr_comment",
+        }
 
     async def test_run_evaluation_schema(self):
         tools = await list_tools()
@@ -356,6 +361,198 @@ class TestGetEvaluationTool:
             f.flush()
             result = await _get_evaluation({"results_path": f.name})
         assert result[0].type == "text"
+
+
+# ---------------------------------------------------------------------------
+# Server app
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# compare_runs tool
+# ---------------------------------------------------------------------------
+
+
+class TestCompareRunsTool:
+    async def test_compare_runs_schema(self):
+        tools = await list_tools()
+        tool = next(t for t in tools if t.name == "compare_runs")
+        schema = tool.inputSchema
+        assert "baseline_path" in schema["properties"]
+        assert "current_path" in schema["properties"]
+        assert "tolerance" in schema["properties"]
+        assert "baseline_path" in schema["required"]
+        assert "current_path" in schema["required"]
+
+    async def test_routes_to_compare_runs(self):
+        result = await call_tool("compare_runs", {
+            "baseline_path": "/nonexistent/baseline.json",
+            "current_path": "/nonexistent/current.json",
+        })
+        assert "not found" in result[0].text.lower() or "File not found" in result[0].text
+
+    async def test_baseline_not_found(self):
+        result = await _compare_runs({
+            "baseline_path": "/nonexistent/baseline.json",
+            "current_path": "/nonexistent/current.json",
+        })
+        assert "File not found" in result[0].text
+
+    async def test_current_not_found(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"timestamp": "t1", "overall": {}}, f)
+            f.flush()
+            result = await _compare_runs({
+                "baseline_path": f.name,
+                "current_path": "/nonexistent/current.json",
+            })
+        assert "File not found" in result[0].text
+
+    async def test_successful_comparison(self):
+        baseline_data = {
+            "timestamp": "t1",
+            "overall": {"model-a": {"avg_faithfulness": 0.9, "avg_relevance": 0.85}},
+        }
+        current_data = {
+            "timestamp": "t2",
+            "overall": {"model-a": {"avg_faithfulness": 0.88, "avg_relevance": 0.87}},
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as bf:
+            json.dump(baseline_data, bf)
+            bf.flush()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as cf:
+            json.dump(current_data, cf)
+            cf.flush()
+
+        result = await _compare_runs({
+            "baseline_path": bf.name,
+            "current_path": cf.name,
+        })
+        data = json.loads(result[0].text)
+        assert data["has_regressions"] is False
+        assert "model-a" in data["models"]
+
+    async def test_comparison_with_tolerance(self):
+        baseline_data = {"timestamp": "t1", "overall": {"m": {"avg_faithfulness": 0.9}}}
+        current_data = {"timestamp": "t2", "overall": {"m": {"avg_faithfulness": 0.8}}}
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as bf:
+            json.dump(baseline_data, bf)
+            bf.flush()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as cf:
+            json.dump(current_data, cf)
+            cf.flush()
+
+        # With large tolerance, no regression
+        result = await _compare_runs({
+            "baseline_path": bf.name,
+            "current_path": cf.name,
+            "tolerance": {"faithfulness": 0.2},
+        })
+        data = json.loads(result[0].text)
+        assert data["has_regressions"] is False
+
+
+# ---------------------------------------------------------------------------
+# format_pr_comment tool
+# ---------------------------------------------------------------------------
+
+
+class TestFormatPrCommentTool:
+    async def test_format_pr_comment_schema(self):
+        tools = await list_tools()
+        tool = next(t for t in tools if t.name == "format_pr_comment")
+        schema = tool.inputSchema
+        assert "summary_path" in schema["properties"]
+        assert "comparison_path" in schema["properties"]
+        assert "thresholds" in schema["properties"]
+        assert "summary_path" in schema["required"]
+
+    async def test_routes_to_format_pr_comment(self):
+        result = await call_tool("format_pr_comment", {
+            "summary_path": "/nonexistent/summary.json",
+        })
+        assert "not found" in result[0].text.lower() or "File not found" in result[0].text
+
+    async def test_summary_not_found(self):
+        result = await _format_pr_comment({
+            "summary_path": "/nonexistent/summary.json",
+        })
+        assert "File not found" in result[0].text
+
+    async def test_successful_format(self):
+        summary_data = {
+            "timestamp": "20250101_000000",
+            "total_questions": 3,
+            "total_estimated_cost": 0.01,
+            "judge_model": "gpt-4o-mini",
+            "overall": {
+                "model-a": {"avg_faithfulness": 0.9, "avg_relevance": 0.85, "avg_ttft_ms": 150, "avg_cost_per_query": 0.001},
+            },
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(summary_data, f)
+            f.flush()
+            result = await _format_pr_comment({"summary_path": f.name})
+        assert "## LLM Eval Results" in result[0].text
+        assert "model-a" in result[0].text
+
+    async def test_format_with_thresholds(self):
+        summary_data = {
+            "timestamp": "20250101_000000",
+            "total_questions": 3,
+            "total_estimated_cost": 0.01,
+            "judge_model": "gpt-4o-mini",
+            "overall": {
+                "model-a": {"avg_faithfulness": 0.9, "avg_relevance": 0.85},
+            },
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(summary_data, f)
+            f.flush()
+            result = await _format_pr_comment({
+                "summary_path": f.name,
+                "thresholds": {"avg_faithfulness": 0.8},
+            })
+        assert "Threshold details" in result[0].text
+
+    async def test_format_with_comparison(self):
+        summary_data = {
+            "timestamp": "20250101_000000",
+            "total_questions": 3,
+            "total_estimated_cost": 0.01,
+            "judge_model": "gpt-4o-mini",
+            "overall": {"model-a": {"avg_faithfulness": 0.7}},
+        }
+        comparison_data = {
+            "regressions": [
+                {"model": "model-a", "metric": "faithfulness", "baseline": 0.9, "current": 0.7, "delta": -0.2},
+            ],
+            "has_regressions": True,
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as sf:
+            json.dump(summary_data, sf)
+            sf.flush()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as cf:
+            json.dump(comparison_data, cf)
+            cf.flush()
+
+        result = await _format_pr_comment({
+            "summary_path": sf.name,
+            "comparison_path": cf.name,
+        })
+        assert "faithfulness" in result[0].text
+        assert "-0.2000" in result[0].text
+
+    async def test_comparison_file_not_found(self):
+        summary_data = {"timestamp": "t", "overall": {}, "total_questions": 0, "total_estimated_cost": 0, "judge_model": "x"}
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as sf:
+            json.dump(summary_data, sf)
+            sf.flush()
+            result = await _format_pr_comment({
+                "summary_path": sf.name,
+                "comparison_path": "/nonexistent/comparison.json",
+            })
+        assert "File not found" in result[0].text
 
 
 # ---------------------------------------------------------------------------

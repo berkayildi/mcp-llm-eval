@@ -9,6 +9,8 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
 from . import engine
+from .comparison import compare_runs
+from .formatter import format_pr_comment
 from .types import ModelConfig, RunSummary, ThresholdConfig
 
 app = Server("mcp-llm-eval")
@@ -163,6 +165,92 @@ async def list_tools() -> list[types.Tool]:
                 "required": ["results_path"],
             },
         ),
+        types.Tool(
+            name="compare_runs",
+            description=(
+                "Compare two evaluation runs and detect regressions. "
+                "Flags metrics that worsened beyond configurable tolerance."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "baseline_path": {
+                        "type": "string",
+                        "description": "Path to baseline evaluation summary JSON.",
+                    },
+                    "current_path": {
+                        "type": "string",
+                        "description": "Path to current evaluation summary JSON.",
+                    },
+                    "tolerance": {
+                        "type": "object",
+                        "description": "Per-metric regression tolerance.",
+                        "properties": {
+                            "faithfulness": {
+                                "type": "number",
+                                "description": "Allowed drop in avg faithfulness (default 0.05).",
+                            },
+                            "relevance": {
+                                "type": "number",
+                                "description": "Allowed drop in avg relevance (default 0.05).",
+                            },
+                            "ttft_ms": {
+                                "type": "integer",
+                                "description": "Allowed increase in avg TTFT ms (default 200).",
+                            },
+                            "cost": {
+                                "type": "number",
+                                "description": "Allowed increase in avg cost per query (default 0.005).",
+                            },
+                        },
+                    },
+                },
+                "required": ["baseline_path", "current_path"],
+            },
+        ),
+        types.Tool(
+            name="format_pr_comment",
+            description=(
+                "Generate a markdown PR comment from evaluation results. "
+                "Includes results table, regression details, and threshold status."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "summary_path": {
+                        "type": "string",
+                        "description": "Path to evaluation summary JSON.",
+                    },
+                    "comparison_path": {
+                        "type": "string",
+                        "description": "Path to compare_runs output JSON (optional).",
+                    },
+                    "thresholds": {
+                        "type": "object",
+                        "description": "Quality gate thresholds for pass/fail badges.",
+                        "properties": {
+                            "avg_faithfulness": {
+                                "type": "number",
+                                "description": "Minimum average faithfulness score (0-1).",
+                            },
+                            "avg_relevance": {
+                                "type": "number",
+                                "description": "Minimum average relevance score (0-1).",
+                            },
+                            "p95_ttft_ms": {
+                                "type": "integer",
+                                "description": "Maximum p95 time-to-first-token in ms.",
+                            },
+                            "max_cost_per_query": {
+                                "type": "number",
+                                "description": "Maximum cost per query in USD.",
+                            },
+                        },
+                    },
+                },
+                "required": ["summary_path"],
+            },
+        ),
     ]
 
 
@@ -176,6 +264,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextCont
         return await _list_evaluations(arguments)
     if name == "get_evaluation":
         return await _get_evaluation(arguments)
+    if name == "compare_runs":
+        return await _compare_runs(arguments)
+    if name == "format_pr_comment":
+        return await _format_pr_comment(arguments)
     raise ValueError(f"Unknown tool: {name}")
 
 
@@ -277,14 +369,71 @@ async def _get_evaluation(arguments: dict[str, Any]) -> list[types.TextContent]:
     return [types.TextContent(type="text", text=json.dumps(data, indent=2))]
 
 
+async def _compare_runs(arguments: dict[str, Any]) -> list[types.TextContent]:
+    baseline_path = arguments["baseline_path"]
+    current_path = arguments["current_path"]
+    tolerance = arguments.get("tolerance")
+
+    bp = Path(baseline_path)
+    cp = Path(current_path)
+
+    if not bp.exists():
+        return [types.TextContent(type="text", text=f"File not found: {baseline_path}")]
+    if not cp.exists():
+        return [types.TextContent(type="text", text=f"File not found: {current_path}")]
+
+    try:
+        baseline = json.loads(bp.read_text(encoding="utf-8"))
+        current = json.loads(cp.read_text(encoding="utf-8"))
+    except Exception as e:
+        return [types.TextContent(type="text", text=f"Error reading files: {e}")]
+
+    result = compare_runs(baseline, current, tolerance)
+    return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
+async def _format_pr_comment(arguments: dict[str, Any]) -> list[types.TextContent]:
+    summary_path = arguments["summary_path"]
+    comparison_path = arguments.get("comparison_path")
+    thresholds = arguments.get("thresholds")
+
+    sp = Path(summary_path)
+    if not sp.exists():
+        return [types.TextContent(type="text", text=f"File not found: {summary_path}")]
+
+    try:
+        summary = json.loads(sp.read_text(encoding="utf-8"))
+    except Exception as e:
+        return [types.TextContent(type="text", text=f"Error reading summary: {e}")]
+
+    comparison = None
+    if comparison_path:
+        cp = Path(comparison_path)
+        if not cp.exists():
+            return [types.TextContent(type="text", text=f"File not found: {comparison_path}")]
+        try:
+            comparison = json.loads(cp.read_text(encoding="utf-8"))
+        except Exception as e:
+            return [types.TextContent(type="text", text=f"Error reading comparison: {e}")]
+
+    markdown = format_pr_comment(summary, comparison=comparison, thresholds=thresholds)
+    return [types.TextContent(type="text", text=markdown)]
+
+
 def main() -> None:
-    import asyncio
+    import sys
 
-    async def _run():
-        async with stdio_server() as (read_stream, write_stream):
-            await app.run(read_stream, write_stream, app.create_initialization_options())
+    if len(sys.argv) > 1:
+        from mcp_llm_eval.cli import cli_main
+        cli_main()
+    else:
+        import asyncio
 
-    asyncio.run(_run())
+        async def _run():
+            async with stdio_server() as (read_stream, write_stream):
+                await app.run(read_stream, write_stream, app.create_initialization_options())
+
+        asyncio.run(_run())
 
 
 if __name__ == "__main__":
