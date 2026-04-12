@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-llm-eval"
+version = "0.1.0"
+description = "MCP server that packages LLM evaluation gates as reusable CI/CD primitives"
+authors = [{ name = "Berkay Yildirim" }]
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["mcp", "llm", "evaluation", "benchmark", "ci-cd"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "mcp>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "build>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/berkayildi/mcp-llm-eval"
+Repository = "https://github.com/berkayildi/mcp-llm-eval"
+Changelog = "https://github.com/berkayildi/mcp-llm-eval/blob/main/CHANGELOG.md"
+
+[project.scripts]
+mcp-llm-eval = "mcp_llm_eval.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_llm_eval"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
