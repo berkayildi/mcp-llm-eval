@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.2.0...v0.3.0) (2026-04-16)
+
+
+### Features
+
+* add e2e test, CLI inline model flags, env example ([701d51c](https://github.com/berkayildi/mcp-llm-eval/commit/701d51cf6a1591e336c9b6ab32d7946e1a330717))
+
 ## [0.2.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.1.0...v0.2.0) (2026-04-12)
 
 
