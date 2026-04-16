@@ -145,7 +145,7 @@ class TestCmdCheck:
             "judge_model": "gpt-4o-mini",
             "overall": {"model-a": {"avg_faithfulness": 0.9, "avg_relevance": 0.85}},
             "results": [
-                {"eval_id": "e1", "category": "adr", "model": "m", "provider": "p",
+                {"eval_id": "e1", "category": "factual", "model": "m", "provider": "p",
                  "time_to_first_token_ms": 100, "cost_per_query": 0.001},
             ],
         }

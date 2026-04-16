@@ -19,11 +19,11 @@ def load_config(path: str) -> dict[str, Any]:
     """
     try:
         import yaml
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "pyyaml is required for config file support. "
             "Install it with: pip install pyyaml"
-        )
+        ) from e
 
     p = Path(path)
     if not p.exists():
@@ -33,7 +33,7 @@ def load_config(path: str) -> dict[str, Any]:
     try:
         data = yaml.safe_load(raw)
     except yaml.YAMLError as e:
-        raise ValueError(f"Invalid YAML in config file: {e}")
+        raise ValueError(f"Invalid YAML in config file: {e}") from e
 
     if not isinstance(data, dict):
         raise ValueError("Config file must be a YAML mapping")

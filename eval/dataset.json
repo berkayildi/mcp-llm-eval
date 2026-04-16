@@ -1,0 +1,26 @@
+[
+  {
+    "id": "smoke_factual_001",
+    "category": "factual",
+    "context": "TensorSphere is a UK-based IT consultancy founded in 2024. The company specializes in cloud infrastructure, AI tooling, and LLMOps. The founding team has backgrounds in biotech, telecom, and enterprise software.",
+    "question": "What does TensorSphere specialize in?",
+    "expected_response": "TensorSphere specializes in cloud infrastructure, AI tooling, and LLMOps.",
+    "tags": ["factual", "company"]
+  },
+  {
+    "id": "smoke_reasoning_002",
+    "category": "reasoning",
+    "context": "A team is choosing between three LLM providers for a real-time chat assistant. Provider A scores highest on quality but has 3 second TTFT. Provider B has the fastest TTFT at 200ms but scores lowest on faithfulness at 0.62. Provider C is mid-range on both quality and speed with the lowest cost per query.",
+    "question": "Which provider should the team choose for real-time use and why?",
+    "expected_response": "Provider C is the best choice for real-time use. Provider A is too slow despite high quality. Provider B has dangerously low faithfulness. Provider C balances speed, quality, and cost.",
+    "tags": ["reasoning", "tradeoff"]
+  },
+  {
+    "id": "smoke_summarization_003",
+    "category": "summarization",
+    "context": "The quarterly review covered three topics. First, the engineering team shipped mcp-llm-eval to PyPI with 260 tests and 6 MCP tools. Second, the business development pipeline has two active leads, one in biotech and one in fintech. Third, the team agreed to defer AWS infrastructure spending until monthly revenue exceeds operational costs.",
+    "question": "Summarize the key decisions from the quarterly review.",
+    "expected_response": "Three decisions: mcp-llm-eval shipped to PyPI, two BD leads are active in biotech and fintech, and AWS spending is deferred until revenue covers costs.",
+    "tags": ["summarization", "review"]
+  }
+]

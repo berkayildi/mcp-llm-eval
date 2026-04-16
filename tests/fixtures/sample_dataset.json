@@ -1,26 +1,26 @@
 [
   {
-    "id": "adr-001",
+    "id": "entry-001",
     "category": "factual",
-    "context": "Architecture Decision Record meeting discussing migration from PostgreSQL to DynamoDB for the user sessions service. The team agreed that DynamoDB's single-digit millisecond latency at scale was the primary driver. Cost analysis showed a 40% reduction in database costs at projected 10M DAU. Risk: loss of complex query capability mitigated by keeping PostgreSQL for analytics. Timeline: 8 weeks with 2-week rollback window. Decision owner: Sarah Chen.",
-    "question": "What was the main reason for choosing DynamoDB over PostgreSQL for the sessions service?",
-    "expected_response": "The primary driver for choosing DynamoDB was its single-digit millisecond latency at scale, which is critical for the user sessions service. Additionally, the cost analysis projected a 40% reduction in database costs at 10M DAU.",
-    "tags": ["database", "migration", "architecture"]
+    "context": "PyPI, the Python Package Index, launched in October 2002 as the official third-party software repository for Python. As of 2024, PyPI hosts over 500,000 packages from more than 900,000 contributors. The service is maintained by the Python Software Foundation.",
+    "question": "When was PyPI launched and how many packages does it host?",
+    "expected_response": "PyPI launched in October 2002. As of 2024, it hosts over 500,000 packages.",
+    "tags": ["factual", "package-index"]
   },
   {
-    "id": "sprint-001",
+    "id": "entry-002",
     "category": "reasoning",
-    "context": "Sprint retrospective for Sprint 23. Velocity: 42 points completed out of 48 planned. Carried over: AUTH-456 (OAuth token refresh, 3 points) and API-789 (rate limiting headers, 3 points). Key wins: shipped the new onboarding flow 2 days early, reduced CI pipeline time from 12 to 7 minutes. Blockers discussed: staging environment was down for 6 hours on Wednesday due to a misconfigured load balancer. Action items: DevOps to add health check alerts (owner: Mike), QA to automate regression suite for onboarding (owner: Lisa), all team members to update Jira before standup.",
-    "question": "What were the action items from the Sprint 23 retrospective?",
-    "expected_response": "Three action items were identified: (1) DevOps (Mike) to add health check alerts for the staging environment, (2) QA (Lisa) to automate the regression suite for the new onboarding flow, and (3) all team members to update Jira before standup.",
-    "tags": ["sprint", "retrospective", "action-items"]
+    "context": "Three sorting algorithms are benchmarked on a 10,000 element list. Quicksort averages 2ms but has O(n^2) worst case. Mergesort averages 4ms with guaranteed O(n log n). Heapsort averages 5ms with O(n log n) worst case and no extra memory. The input distribution is unknown.",
+    "question": "Which algorithm is the best choice when worst-case guarantees matter more than average speed?",
+    "expected_response": "Mergesort is the best choice. Quicksort is fastest on average but has O(n^2) worst case, so it fails the guarantee requirement. Mergesort and heapsort both offer O(n log n) worst case; mergesort is faster on average.",
+    "tags": ["reasoning", "algorithms"]
   },
   {
-    "id": "discovery-001",
+    "id": "entry-003",
     "category": "summarization",
-    "context": "Product discovery session with enterprise customers about notification preferences. Key findings: 78% of users want granular per-channel notification controls (email, Slack, in-app). Current system only supports global on/off. Top complaint: too many email notifications causing users to disable all notifications entirely. Proposed solution: three-tier system (critical/informational/marketing) with per-channel toggles. Engineering estimate: 3 sprints for backend, 2 sprints for frontend. Revenue impact: 3 churned enterprise accounts cited notification overload as a factor in exit interviews.",
-    "question": "What notification system changes did the discovery session recommend?",
-    "expected_response": "The session recommended a three-tier notification system (critical, informational, marketing) with per-channel toggles for email, Slack, and in-app notifications. This replaces the current global on/off switch and addresses the top complaint of notification overload that has contributed to enterprise churn.",
-    "tags": ["product", "notifications", "enterprise"]
+    "context": "The release notes for version 3.12 of a Python library cover three changes. First, the streaming API was rewritten to use asyncio generators instead of callbacks. Second, a new caching layer reduced repeat lookup latency from 40ms to under 1ms. Third, the deprecated v1 authentication flow was removed; users must migrate to v2 tokens.",
+    "question": "Summarize the key changes in version 3.12.",
+    "expected_response": "Three changes: the streaming API was rewritten to use asyncio generators, a new caching layer cut lookup latency from 40ms to under 1ms, and the deprecated v1 auth flow was removed in favor of v2 tokens.",
+    "tags": ["summarization", "release-notes"]
   }
 ]

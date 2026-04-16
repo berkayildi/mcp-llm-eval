@@ -1,7 +1,5 @@
 """Tests for comparison.py: regression detection, tolerance math, edge cases."""
 
-import pytest
-
 from mcp_llm_eval.comparison import compare_runs, _apply_tolerance_defaults
 
 

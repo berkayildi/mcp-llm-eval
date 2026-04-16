@@ -23,14 +23,14 @@ class TestEvalEntry:
     def test_from_dict_minimal(self):
         data = {
             "id": "test-001",
-            "category": "adr",
+            "category": "factual",
             "context": "Some context",
             "question": "What happened?",
             "expected_response": "Something happened.",
         }
         entry = EvalEntry.from_dict(data)
         assert entry.id == "test-001"
-        assert entry.category == "adr"
+        assert entry.category == "factual"
         assert entry.context == "Some context"
         assert entry.question == "What happened?"
         assert entry.expected_response == "Something happened."
@@ -39,7 +39,7 @@ class TestEvalEntry:
     def test_from_dict_with_tags(self):
         data = {
             "id": "test-002",
-            "category": "sprint",
+            "category": "reasoning",
             "context": "Context",
             "question": "Question",
             "expected_response": "Response",
@@ -51,7 +51,7 @@ class TestEvalEntry:
     def test_to_dict_roundtrip(self):
         data = {
             "id": "test-003",
-            "category": "discovery",
+            "category": "summarization",
             "context": "Context",
             "question": "Question",
             "expected_response": "Response",
@@ -68,7 +68,7 @@ class TestEvalEntry:
 
     def test_default_tags(self):
         entry = EvalEntry(
-            id="x", category="adr", context="c", question="q", expected_response="r"
+            id="x", category="factual", context="c", question="q", expected_response="r"
         )
         assert entry.tags == []
 
@@ -127,7 +127,7 @@ class TestModelConfig:
 
 class TestEvalResult:
     def test_defaults(self):
-        r = EvalResult(eval_id="e1", category="adr", model="m", provider="p")
+        r = EvalResult(eval_id="e1", category="factual", model="m", provider="p")
         assert r.response is None
         assert r.input_tokens == 0
         assert r.output_tokens == 0
@@ -142,7 +142,7 @@ class TestEvalResult:
 
     def test_to_dict(self):
         r = EvalResult(
-            eval_id="e1", category="adr", model="m", provider="p",
+            eval_id="e1", category="factual", model="m", provider="p",
             response="hello", input_tokens=100, output_tokens=50,
         )
         d = r.to_dict()
@@ -153,7 +153,7 @@ class TestEvalResult:
     def test_from_dict(self):
         data = {
             "eval_id": "e2",
-            "category": "sprint",
+            "category": "reasoning",
             "model": "gpt-4o",
             "provider": "openai",
             "response": "world",
@@ -167,7 +167,7 @@ class TestEvalResult:
     def test_from_dict_ignores_extra_keys(self):
         data = {
             "eval_id": "e3",
-            "category": "adr",
+            "category": "factual",
             "model": "m",
             "provider": "p",
             "unknown_key": "value",
@@ -177,7 +177,7 @@ class TestEvalResult:
 
     def test_error_result(self):
         r = EvalResult(
-            eval_id="e4", category="adr", model="m", provider="p",
+            eval_id="e4", category="factual", model="m", provider="p",
             error="connection timeout",
         )
         assert r.error == "connection timeout"
@@ -185,7 +185,7 @@ class TestEvalResult:
 
     def test_with_judge_scores(self):
         r = EvalResult(
-            eval_id="e5", category="discovery", model="m", provider="p",
+            eval_id="e5", category="summarization", model="m", provider="p",
             faithfulness_score=0.85, faithfulness_reason="well grounded",
             relevance_score=0.95, relevance_reason="directly answers",
             judge_model="gpt-4o-mini",

@@ -318,7 +318,7 @@ async def _check_thresholds(arguments: dict[str, Any]) -> list[types.TextContent
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
         summary = RunSummary.from_dict(data)
-    except Exception as e:
+    except (json.JSONDecodeError, KeyError, TypeError, OSError) as e:
         return [types.TextContent(type="text", text=f"Error reading results: {e}")]
 
     thresholds = ThresholdConfig.from_dict(thresholds_raw)
@@ -348,7 +348,7 @@ async def _list_evaluations(arguments: dict[str, Any]) -> list[types.TextContent
                 "judge_model": data.get("judge_model"),
                 "models": list(data.get("overall", {}).keys()),
             })
-        except Exception:
+        except (json.JSONDecodeError, OSError):
             continue
 
     return [types.TextContent(type="text", text=json.dumps(runs, indent=2))]
@@ -363,7 +363,7 @@ async def _get_evaluation(arguments: dict[str, Any]) -> list[types.TextContent]:
 
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
-    except Exception as e:
+    except (json.JSONDecodeError, OSError) as e:
         return [types.TextContent(type="text", text=f"Error reading file: {e}")]
 
     return [types.TextContent(type="text", text=json.dumps(data, indent=2))]
@@ -385,7 +385,7 @@ async def _compare_runs(arguments: dict[str, Any]) -> list[types.TextContent]:
     try:
         baseline = json.loads(bp.read_text(encoding="utf-8"))
         current = json.loads(cp.read_text(encoding="utf-8"))
-    except Exception as e:
+    except (json.JSONDecodeError, OSError) as e:
         return [types.TextContent(type="text", text=f"Error reading files: {e}")]
 
     result = compare_runs(baseline, current, tolerance)
@@ -403,7 +403,7 @@ async def _format_pr_comment(arguments: dict[str, Any]) -> list[types.TextConten
 
     try:
         summary = json.loads(sp.read_text(encoding="utf-8"))
-    except Exception as e:
+    except (json.JSONDecodeError, OSError) as e:
         return [types.TextContent(type="text", text=f"Error reading summary: {e}")]
 
     comparison = None
@@ -413,7 +413,7 @@ async def _format_pr_comment(arguments: dict[str, Any]) -> list[types.TextConten
             return [types.TextContent(type="text", text=f"File not found: {comparison_path}")]
         try:
             comparison = json.loads(cp.read_text(encoding="utf-8"))
-        except Exception as e:
+        except (json.JSONDecodeError, OSError) as e:
             return [types.TextContent(type="text", text=f"Error reading comparison: {e}")]
 
     markdown = format_pr_comment(summary, comparison=comparison, thresholds=thresholds)

@@ -27,6 +27,8 @@ def cli_main(argv: list[str] | None = None) -> None:
     run_parser = subparsers.add_parser("run", help="Run a full evaluation")
     run_parser.add_argument("--dataset", help="Path to evaluation dataset JSON")
     run_parser.add_argument("--config", help="Path to .eval-gate.yml config file")
+    run_parser.add_argument("--models", help="JSON array of model config objects (alternative to --config)")
+    run_parser.add_argument("--judge-model", help="Judge model name (default: gpt-4o-mini)")
     run_parser.add_argument("--output-dir", help="Directory to save results")
 
     # check subcommand
@@ -87,9 +89,19 @@ def _cmd_run(args: argparse.Namespace) -> None:
 
     output_dir = args.output_dir or config.get("output_dir", "eval/results")
 
-    models_raw = config.get("models")
+    # Models from --models JSON string or --config file
+    models_raw = None
+    if args.models:
+        try:
+            models_raw = json.loads(args.models)
+        except json.JSONDecodeError as e:
+            print(f"Error: Invalid --models JSON: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        models_raw = config.get("models")
+
     if not models_raw:
-        print("Error: --config with 'models' is required for run", file=sys.stderr)
+        print("Error: --models or --config with 'models' is required for run", file=sys.stderr)
         sys.exit(1)
 
     try:
@@ -100,7 +112,9 @@ def _cmd_run(args: argparse.Namespace) -> None:
 
     model_configs = [ModelConfig.from_dict(m) for m in models_raw]
 
-    judge_config = config.get("judge")
+    judge_config = config.get("judge", {})
+    if args.judge_model:
+        judge_config["model"] = args.judge_model
     tracing_config = config.get("tracing")
 
     try:

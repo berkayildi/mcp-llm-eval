@@ -9,16 +9,16 @@ from typing import Any
 genai = None
 
 
-def _ensure_genai():
+def _ensure_genai() -> Any:
     global genai
     if genai is None:
         try:
             from google import genai as _genai
             genai = _genai
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Google GenAI SDK not installed. Install it with: pip install google-genai"
-            )
+            ) from e
     return genai
 
 

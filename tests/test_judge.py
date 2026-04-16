@@ -53,7 +53,7 @@ class TestEvaluateResponse:
         client = _make_mock_client(_valid_scores_json())
         result = evaluate_response(
             client=client,
-            context="Meeting about database migration.",
+            context="Notes on a database migration.",
             question="Why DynamoDB?",
             expected_response="Low latency at scale.",
             response="DynamoDB offers single-digit ms latency.",

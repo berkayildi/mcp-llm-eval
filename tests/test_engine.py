@@ -44,7 +44,7 @@ class TestLoadDataset:
     def test_first_entry_fields(self):
         entries = load_dataset(str(SAMPLE_DATASET))
         e = entries[0]
-        assert e.id == "adr-001"
+        assert e.id == "entry-001"
         assert e.category == "factual"
         assert len(e.context) > 0
         assert len(e.question) > 0
@@ -92,7 +92,7 @@ class TestLoadDataset:
 
     def test_missing_required_keys(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump([{"id": "x", "category": "adr"}], f)
+            json.dump([{"id": "x", "category": "factual"}], f)
             f.flush()
             try:
                 with pytest.raises(ValueError, match="missing required"):
@@ -102,7 +102,7 @@ class TestLoadDataset:
 
     def test_tags_optional(self):
         data = [{
-            "id": "t1", "category": "adr",
+            "id": "t1", "category": "factual",
             "context": "c", "question": "q", "expected_response": "r",
         }]
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -117,7 +117,7 @@ class TestLoadDataset:
     def test_multiple_entries_with_tags(self):
         data = [
             {
-                "id": f"t{i}", "category": "adr",
+                "id": f"t{i}", "category": "factual",
                 "context": "c", "question": "q", "expected_response": "r",
                 "tags": [f"tag{i}"],
             }
@@ -145,7 +145,7 @@ class TestAggregate:
 
     def test_single_result(self):
         r = EvalResult(
-            eval_id="e1", category="adr", model="m", provider="p",
+            eval_id="e1", category="factual", model="m", provider="p",
             input_tokens=100, output_tokens=50,
             time_to_first_token_ms=150, total_latency_ms=2000,
             cost_per_query=0.001, faithfulness_score=0.9, relevance_score=0.8,
@@ -160,7 +160,7 @@ class TestAggregate:
     def test_multiple_results(self):
         results = [
             EvalResult(
-                eval_id=f"e{i}", category="adr", model="m", provider="p",
+                eval_id=f"e{i}", category="factual", model="m", provider="p",
                 input_tokens=100, output_tokens=50,
                 time_to_first_token_ms=100 + i * 50, total_latency_ms=1000 + i * 500,
                 cost_per_query=0.001,
@@ -174,7 +174,7 @@ class TestAggregate:
 
     def test_no_scores(self):
         r = EvalResult(
-            eval_id="e1", category="adr", model="m", provider="p",
+            eval_id="e1", category="factual", model="m", provider="p",
             input_tokens=100, output_tokens=50,
             total_latency_ms=1000, cost_per_query=0.001,
         )
@@ -184,12 +184,12 @@ class TestAggregate:
 
     def test_mixed_scored_unscored(self):
         r1 = EvalResult(
-            eval_id="e1", category="adr", model="m", provider="p",
+            eval_id="e1", category="factual", model="m", provider="p",
             input_tokens=100, output_tokens=50, total_latency_ms=1000,
             cost_per_query=0.001, faithfulness_score=0.9, relevance_score=0.8,
         )
         r2 = EvalResult(
-            eval_id="e2", category="adr", model="m", provider="p",
+            eval_id="e2", category="factual", model="m", provider="p",
             input_tokens=100, output_tokens=50, total_latency_ms=1000,
             cost_per_query=0.001,
         )
@@ -199,7 +199,7 @@ class TestAggregate:
 
     def test_null_ttft_treated_as_zero(self):
         r = EvalResult(
-            eval_id="e1", category="adr", model="m", provider="p",
+            eval_id="e1", category="factual", model="m", provider="p",
             input_tokens=100, output_tokens=50, total_latency_ms=1000,
             cost_per_query=0.001,
         )
@@ -255,9 +255,9 @@ class TestCheckThresholds:
                 "model-a": {"avg_faithfulness": 0.9, "avg_relevance": 0.85},
             },
             results=[
-                {"eval_id": "e1", "category": "adr", "model": "m", "provider": "p",
+                {"eval_id": "e1", "category": "factual", "model": "m", "provider": "p",
                  "time_to_first_token_ms": 100, "cost_per_query": 0.001},
-                {"eval_id": "e2", "category": "adr", "model": "m", "provider": "p",
+                {"eval_id": "e2", "category": "factual", "model": "m", "provider": "p",
                  "time_to_first_token_ms": 200, "cost_per_query": 0.002},
             ],
         )
@@ -290,7 +290,7 @@ class TestCheckThresholds:
     def test_p95_ttft_fail(self):
         summary = self._make_summary(
             results=[
-                {"eval_id": f"e{i}", "category": "adr", "model": "m", "provider": "p",
+                {"eval_id": f"e{i}", "category": "factual", "model": "m", "provider": "p",
                  "time_to_first_token_ms": 100 + i * 100, "cost_per_query": 0.001}
                 for i in range(20)
             ],
@@ -305,7 +305,7 @@ class TestCheckThresholds:
     def test_cost_fail(self):
         summary = self._make_summary(
             results=[
-                {"eval_id": "e1", "category": "adr", "model": "m", "provider": "p",
+                {"eval_id": "e1", "category": "factual", "model": "m", "provider": "p",
                  "cost_per_query": 0.05},
             ],
         )
@@ -346,9 +346,9 @@ class TestCheckThresholds:
     def test_error_results_excluded(self):
         summary = self._make_summary(
             results=[
-                {"eval_id": "e1", "category": "adr", "model": "m", "provider": "p",
+                {"eval_id": "e1", "category": "factual", "model": "m", "provider": "p",
                  "cost_per_query": 0.001},
-                {"eval_id": "e2", "category": "adr", "model": "m", "provider": "p",
+                {"eval_id": "e2", "category": "factual", "model": "m", "provider": "p",
                  "error": "timeout", "cost_per_query": 0.0},
             ],
         )
@@ -394,7 +394,7 @@ class TestRunEvaluation:
     def _make_dataset(self):
         return [
             EvalEntry(
-                id="e1", category="adr", context="ctx",
+                id="e1", category="factual", context="ctx",
                 question="q", expected_response="r",
             ),
         ]

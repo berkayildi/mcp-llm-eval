@@ -9,10 +9,10 @@ from typing import Any
 def _get_client() -> Any:
     try:
         import anthropic
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "Anthropic SDK not installed. Install it with: pip install anthropic"
-        )
+        ) from e
     return anthropic.Anthropic()
 
 

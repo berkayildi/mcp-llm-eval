@@ -48,10 +48,10 @@ DEFAULT_JUDGE_MODEL = "gpt-4o-mini"
 def _get_openai_client() -> Any:
     try:
         import openai
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "OpenAI SDK not installed. The judge requires it: pip install openai"
-        )
+        ) from e
     return openai.OpenAI()
 
 

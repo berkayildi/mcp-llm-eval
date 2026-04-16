@@ -1,7 +1,5 @@
 """Tests for formatter.py: markdown generation, with/without comparison and thresholds."""
 
-import pytest
-
 from mcp_llm_eval.formatter import (
     format_pr_comment,
     _check_thresholds_inline,

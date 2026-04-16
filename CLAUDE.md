@@ -184,7 +184,7 @@ make clean    # remove venv, dist, caches
   "total_elapsed_sec": 120.5,
   "results": [
     {
-      "eval_id": "adr-001",
+      "eval_id": "entry-001",
       "category": "factual",
       "model": "model-name",
       "provider": "openai",

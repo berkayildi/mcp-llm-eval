@@ -9,10 +9,10 @@ from typing import Any
 def _get_client() -> Any:
     try:
         import openai
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "OpenAI SDK not installed. Install it with: pip install openai"
-        )
+        ) from e
     return openai.OpenAI()
 
 

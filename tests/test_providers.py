@@ -1,7 +1,6 @@
 """Tests for provider runners with mocked SDK clients."""
 
-import time
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 

@@ -61,3 +61,6 @@ dmypy.json
 
 # Logs
 *.log
+
+# Eval results (smoke test output)
+eval/results/

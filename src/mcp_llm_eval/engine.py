@@ -131,17 +131,15 @@ def run_evaluation(
         try:
             clients[provider] = _get_client(provider)
         except ImportError as e:
-            raise ImportError(f"Provider '{provider}' SDK not available: {e}")
+            raise ImportError(f"Provider '{provider}' SDK not available: {e}") from e
 
-    # Tracing setup (optional langsmith)
-    ls_client = None
     if tracing_config and tracing_config.get("enabled"):
         try:
             import langsmith
-            ls_client = langsmith.Client(
+            langsmith.Client(
                 api_url=tracing_config.get("endpoint", "https://api.smith.langchain.com"),
             )
-        except Exception:
+        except ImportError:
             pass
 
     results: list[EvalResult] = []
