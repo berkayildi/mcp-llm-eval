@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-llm-eval"
-version = "0.2.0"
+version = "0.3.0"
 description = "MCP server that packages LLM evaluation gates as reusable CI/CD primitives"
 authors = [{ name = "Berkay Yildirim" }]
 readme = "README.md"
