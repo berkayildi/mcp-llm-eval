@@ -11,16 +11,16 @@ fi
 echo "=== mcp-llm-eval e2e test ==="
 echo ""
 echo "Required keys: ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY"
-echo "  ANTHROPIC_API_KEY — runs Haiku as eval target"
+echo "  ANTHROPIC_API_KEY — runs Claude Sonnet 4.6 and Haiku 4.5 as eval targets"
 echo "  OPENAI_API_KEY — runs GPT-4o-mini as eval target + judge"
-echo "  GOOGLE_API_KEY — runs Gemini 2.5 Flash-Lite as eval target"
+echo "  GOOGLE_API_KEY — runs Gemini 2.5 Flash and Flash-Lite as eval targets"
 echo ""
 
-# Step 1: Run evaluation with 3 models across 3 providers
-echo "[1/4] Running evaluation with 3 models (Haiku, GPT-4o-mini, Gemini Flash-Lite)..."
+# Step 1: Run evaluation with 5 models across 3 providers
+echo "[1/4] Running evaluation with 5 models (Sonnet 4.6, Haiku 4.5, GPT-4o-mini, Gemini 2.5 Flash, Gemini 2.5 Flash-Lite)..."
 mcp-llm-eval run \
   --dataset eval/dataset.json \
-  --models '[{"provider": "anthropic", "model": "claude-haiku-4-5-20251001", "max_tokens": 300, "input_cost_per_mtok": 1.0, "output_cost_per_mtok": 5.0}, {"provider": "openai", "model": "gpt-4o-mini", "max_tokens": 300, "input_cost_per_mtok": 0.15, "output_cost_per_mtok": 0.60}, {"provider": "google", "model": "gemini-2.5-flash-lite", "max_tokens": 300, "input_cost_per_mtok": 0.075, "output_cost_per_mtok": 0.30}]' \
+  --models '[{"provider": "anthropic", "model": "claude-sonnet-4-6", "max_tokens": 500, "input_cost_per_mtok": 3.0, "output_cost_per_mtok": 15.0}, {"provider": "anthropic", "model": "claude-haiku-4-5-20251001", "max_tokens": 300, "input_cost_per_mtok": 1.0, "output_cost_per_mtok": 5.0}, {"provider": "openai", "model": "gpt-4o-mini", "max_tokens": 300, "input_cost_per_mtok": 0.15, "output_cost_per_mtok": 0.60}, {"provider": "google", "model": "gemini-2.5-flash", "max_tokens": 300, "input_cost_per_mtok": 0.15, "output_cost_per_mtok": 0.60}, {"provider": "google", "model": "gemini-2.5-flash-lite", "max_tokens": 300, "input_cost_per_mtok": 0.075, "output_cost_per_mtok": 0.30}]' \
   --judge-model gpt-4o-mini \
   --output-dir eval/results
 

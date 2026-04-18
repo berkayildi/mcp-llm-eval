@@ -8,6 +8,22 @@
     "tags": ["factual", "company"]
   },
   {
+    "id": "smoke_factual_004",
+    "category": "factual",
+    "context": "The James Webb Space Telescope launched on December 25, 2021 from French Guiana. It orbits the Sun at the second Lagrange point, approximately 1.5 million kilometers from Earth. Its primary mirror is 6.5 meters in diameter and is made of 18 hexagonal beryllium segments coated in gold.",
+    "question": "Where does the James Webb Space Telescope orbit and how far is it from Earth?",
+    "expected_response": "The James Webb Space Telescope orbits the Sun at the second Lagrange point, approximately 1.5 million kilometers from Earth.",
+    "tags": ["factual", "science"]
+  },
+  {
+    "id": "smoke_factual_005",
+    "category": "factual",
+    "context": "The EU AI Act entered into force on August 1, 2024. It classifies AI systems into four risk tiers: unacceptable, high, limited, and minimal. General-purpose AI model obligations apply from August 2, 2025, while high-risk system rules take full effect from August 2, 2026.",
+    "question": "When do the general-purpose AI model obligations under the EU AI Act apply?",
+    "expected_response": "The general-purpose AI model obligations under the EU AI Act apply from August 2, 2025.",
+    "tags": ["factual", "policy"]
+  },
+  {
     "id": "smoke_reasoning_002",
     "category": "reasoning",
     "context": "A team is choosing between three LLM providers for a real-time chat assistant. Provider A scores highest on quality but has 3 second TTFT. Provider B has the fastest TTFT at 200ms but scores lowest on faithfulness at 0.62. Provider C is mid-range on both quality and speed with the lowest cost per query.",
@@ -16,11 +32,43 @@
     "tags": ["reasoning", "tradeoff"]
   },
   {
+    "id": "smoke_reasoning_006",
+    "category": "reasoning",
+    "context": "A startup has 18 months of runway at current burn of $200k per month. A new hire would increase burn by $15k per month but is projected to close $50k in additional monthly recurring revenue after 6 months. The startup has no other pipeline for revenue growth in the same timeframe.",
+    "question": "Should the startup make the hire, and what is the key financial reasoning?",
+    "expected_response": "Yes, the startup should make the hire. The $15k monthly cost is outweighed by the projected $50k in new monthly recurring revenue after 6 months, which extends runway and is the only identified path to revenue growth.",
+    "tags": ["reasoning", "finance"]
+  },
+  {
+    "id": "smoke_reasoning_007",
+    "category": "reasoning",
+    "context": "An API endpoint shows p99 latency spiking from 200ms to 2s after a deploy. The deploy added a new database index and a caching layer. CPU and memory are unchanged, but database connection pool utilization jumped from 30% to 95%. No new queries were introduced.",
+    "question": "What is the most likely root cause of the latency spike?",
+    "expected_response": "The most likely root cause is the new database index causing increased write contention or query planner changes, saturating the connection pool. The caching layer is unlikely since pool utilization increased rather than decreased.",
+    "tags": ["reasoning", "engineering"]
+  },
+  {
     "id": "smoke_summarization_003",
     "category": "summarization",
     "context": "The quarterly review covered three topics. First, the engineering team shipped mcp-llm-eval to PyPI with 260 tests and 6 MCP tools. Second, the business development pipeline has two active leads, one in biotech and one in fintech. Third, the team agreed to defer AWS infrastructure spending until monthly revenue exceeds operational costs.",
     "question": "Summarize the key decisions from the quarterly review.",
     "expected_response": "Three decisions: mcp-llm-eval shipped to PyPI, two BD leads are active in biotech and fintech, and AWS spending is deferred until revenue covers costs.",
     "tags": ["summarization", "review"]
+  },
+  {
+    "id": "smoke_summarization_008",
+    "category": "summarization",
+    "context": "The central bank held rates steady at 4.5% for the third consecutive meeting. Inflation has cooled to 2.8%, still above the 2% target. Unemployment ticked up slightly to 4.2% from 4.0%. The chair signaled that rate cuts remain data-dependent and warned markets against pricing in cuts before the next inflation print.",
+    "question": "Summarize the central bank's stance and the key economic indicators.",
+    "expected_response": "The central bank held rates at 4.5% for a third meeting. Inflation is 2.8% (above 2% target), unemployment rose slightly to 4.2%, and the chair cautioned that cuts remain data-dependent pending the next inflation print.",
+    "tags": ["summarization", "finance"]
+  },
+  {
+    "id": "smoke_summarization_009",
+    "category": "summarization",
+    "context": "The post-mortem identified three contributing factors to the outage. A misconfigured load balancer routed 100% of traffic to a single availability zone. The on-call runbook was out of date and pointed to a decommissioned dashboard. Finally, alerting thresholds had been silenced two weeks prior during a noisy deploy and never re-enabled.",
+    "question": "Summarize the three contributing factors to the outage.",
+    "expected_response": "Three factors contributed: a misconfigured load balancer sent all traffic to one availability zone, the on-call runbook referenced a decommissioned dashboard, and alerting thresholds had been silenced two weeks earlier and never re-enabled.",
+    "tags": ["summarization", "engineering"]
   }
 ]
