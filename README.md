@@ -146,11 +146,11 @@ Fully quit (`Cmd+Q` on macOS) and reopen. Look for the tools icon to confirm the
 
 ## Example interaction
 
-Claude autonomously chains the tools — running the evaluation, then checking thresholds:
+Claude autonomously chains the tools — running the evaluation, then checking thresholds (numbers below are illustrative):
 
 ```
 Running evaluation...
-- Dataset: 10 questions (4 factual, 3 reasoning, 3 summarization)
+- Dataset: 9 questions (3 factual, 3 reasoning, 3 summarization)
 - Models: claude-sonnet-4-6, gpt-4o-mini
 - Judge: gpt-4o-mini
 
@@ -259,7 +259,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install mcp-llm-eval anthropic openai
+      - run: pip install mcp-llm-eval anthropic openai google-genai
       - run: mcp-llm-eval run --config .eval-gate.yml --dataset eval/dataset.json --output-dir eval/results
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
