@@ -58,6 +58,7 @@ def run(
         config=genai.types.GenerateContentConfig(
             system_instruction=system_prompt,
             max_output_tokens=max_tokens,
+            thinking_config=genai.types.ThinkingConfig(thinking_budget=0),
         ),
     )
 
