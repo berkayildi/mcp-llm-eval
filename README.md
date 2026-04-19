@@ -6,6 +6,15 @@
 
 A local **Model Context Protocol (MCP) server** that packages LLM evaluation gates as reusable CI/CD primitives. Run datasets against multiple models, score responses with an LLM-as-judge, and enforce quality thresholds — all through MCP tools that AI agents can call.
 
+```mermaid
+flowchart LR
+    A[PR opened] --> B[Run dataset<br/>through models]
+    B --> C[Judge scores<br/>faithfulness + relevance]
+    C --> D{Thresholds met?}
+    D -->|Yes| E[PR passes]
+    D -->|No| F[PR blocked<br/>with diff comment]
+```
+
 ---
 
 ## Why?
@@ -271,6 +280,37 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+---
+
+## Running benchmarks locally
+
+mcp-llm-eval's own dataset (`eval/dataset.json`) dogfoods the
+evaluation engine across 5 models, 9 questions, 3 categories
+(factual, reasoning, summarization). The results feed into
+[LLMShot](https://llmshot.vercel.app) as the Eval Gates benchmark.
+
+Create a `.env` file in the project root with API keys for all
+providers:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+GOOGLE_API_KEY=AIza...
+```
+
+Then run:
+
+```bash
+make benchmark        # Run eval against all 5 models
+make benchmark-copy   # Copy results to llm-benchmarks repo
+```
+
+Results are written to `eval/results/` (gitignored). The benchmark
+output feeds into [LLMShot](https://llmshot.vercel.app) via the
+[llm-benchmarks](https://github.com/berkayildi/llm-benchmarks) repo
+at `text-generation/eval-gates-summary.json` and
+`text-generation/eval-gates-benchmark.json`.
 
 ---
 
