@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1](https://github.com/berkayildi/mcp-llm-eval/compare/v0.4.0...v0.4.1) (2026-04-19)
+
+
+### Documentation
+
+* add benchmark workflow and CI flow diagram ([e1e0900](https://github.com/berkayildi/mcp-llm-eval/commit/e1e09005c6f35d25622d8fdaa7ca43aaf189fab1))
+* update readme ([46f8de5](https://github.com/berkayildi/mcp-llm-eval/commit/46f8de5fc5c97200ac6bbcf59038b13af71b4ad8))
+
 ## [0.4.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.3.0...v0.4.0) (2026-04-19)
 
 
