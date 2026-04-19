@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.3.0...v0.4.0) (2026-04-19)
+
+
+### Features
+
+* expand eval dataset to 9 questions, 5 models, add benchmark targets ([67c4a02](https://github.com/berkayildi/mcp-llm-eval/commit/67c4a028edaca10fe382c57c712638a1ba32f42b))
+
+
+### Bug Fixes
+
+* **providers:** disable gemini thinking for benchmark parity ([9d3e15a](https://github.com/berkayildi/mcp-llm-eval/commit/9d3e15afecbfe64c2dcf519a5398240ee2909088))
+
 ## [0.3.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.2.0...v0.3.0) (2026-04-16)
 
 
