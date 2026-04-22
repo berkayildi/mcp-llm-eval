@@ -2,13 +2,13 @@
   {
     "id": "smoke_factual_001",
     "category": "factual",
-    "context": "TensorSphere is a UK-based IT consultancy founded in 2024. The company specializes in cloud infrastructure, AI tooling, and LLMOps. The founding team has backgrounds in biotech, telecom, and enterprise software.",
-    "question": "What does TensorSphere specialize in?",
-    "expected_response": "TensorSphere specializes in cloud infrastructure, AI tooling, and LLMOps.",
+    "context": "Acme Analytics is a fictional UK-based consultancy founded in 2024. The company specializes in data engineering, business intelligence dashboards, and ETL pipeline automation. The founding team has backgrounds in finance, retail analytics, and enterprise software.",
+    "question": "What does Acme Analytics specialize in?",
+    "expected_response": "Acme Analytics specializes in data engineering, business intelligence dashboards, and ETL pipeline automation.",
     "tags": ["factual", "company"]
   },
   {
-    "id": "smoke_factual_004",
+    "id": "smoke_factual_002",
     "category": "factual",
     "context": "The James Webb Space Telescope launched on December 25, 2021 from French Guiana. It orbits the Sun at the second Lagrange point, approximately 1.5 million kilometers from Earth. Its primary mirror is 6.5 meters in diameter and is made of 18 hexagonal beryllium segments coated in gold.",
     "question": "Where does the James Webb Space Telescope orbit and how far is it from Earth?",
@@ -16,7 +16,7 @@
     "tags": ["factual", "science"]
   },
   {
-    "id": "smoke_factual_005",
+    "id": "smoke_factual_003",
     "category": "factual",
     "context": "The EU AI Act entered into force on August 1, 2024. It classifies AI systems into four risk tiers: unacceptable, high, limited, and minimal. General-purpose AI model obligations apply from August 2, 2025, while high-risk system rules take full effect from August 2, 2026.",
     "question": "When do the general-purpose AI model obligations under the EU AI Act apply?",
@@ -24,7 +24,7 @@
     "tags": ["factual", "policy"]
   },
   {
-    "id": "smoke_reasoning_002",
+    "id": "smoke_reasoning_001",
     "category": "reasoning",
     "context": "A team is choosing between three LLM providers for a real-time chat assistant. Provider A scores highest on quality but has 3 second TTFT. Provider B has the fastest TTFT at 200ms but scores lowest on faithfulness at 0.62. Provider C is mid-range on both quality and speed with the lowest cost per query.",
     "question": "Which provider should the team choose for real-time use and why?",
@@ -32,7 +32,7 @@
     "tags": ["reasoning", "tradeoff"]
   },
   {
-    "id": "smoke_reasoning_006",
+    "id": "smoke_reasoning_002",
     "category": "reasoning",
     "context": "A startup has 18 months of runway at current burn of $200k per month. A new hire would increase burn by $15k per month but is projected to close $50k in additional monthly recurring revenue after 6 months. The startup has no other pipeline for revenue growth in the same timeframe.",
     "question": "Should the startup make the hire, and what is the key financial reasoning?",
@@ -40,7 +40,7 @@
     "tags": ["reasoning", "finance"]
   },
   {
-    "id": "smoke_reasoning_007",
+    "id": "smoke_reasoning_003",
     "category": "reasoning",
     "context": "An API endpoint shows p99 latency spiking from 200ms to 2s after a deploy. The deploy added a new database index and a caching layer. CPU and memory are unchanged, but database connection pool utilization jumped from 30% to 95%. No new queries were introduced.",
     "question": "What is the most likely root cause of the latency spike?",
@@ -48,7 +48,7 @@
     "tags": ["reasoning", "engineering"]
   },
   {
-    "id": "smoke_summarization_003",
+    "id": "smoke_summarization_001",
     "category": "summarization",
     "context": "The quarterly review covered three topics. First, the engineering team shipped mcp-llm-eval to PyPI with 260 tests and 6 MCP tools. Second, the business development pipeline has two active leads, one in biotech and one in fintech. Third, the team agreed to defer AWS infrastructure spending until monthly revenue exceeds operational costs.",
     "question": "Summarize the key decisions from the quarterly review.",
@@ -56,7 +56,7 @@
     "tags": ["summarization", "review"]
   },
   {
-    "id": "smoke_summarization_008",
+    "id": "smoke_summarization_002",
     "category": "summarization",
     "context": "The central bank held rates steady at 4.5% for the third consecutive meeting. Inflation has cooled to 2.8%, still above the 2% target. Unemployment ticked up slightly to 4.2% from 4.0%. The chair signaled that rate cuts remain data-dependent and warned markets against pricing in cuts before the next inflation print.",
     "question": "Summarize the central bank's stance and the key economic indicators.",
@@ -64,7 +64,7 @@
     "tags": ["summarization", "finance"]
   },
   {
-    "id": "smoke_summarization_009",
+    "id": "smoke_summarization_003",
     "category": "summarization",
     "context": "The post-mortem identified three contributing factors to the outage. A misconfigured load balancer routed 100% of traffic to a single availability zone. The on-call runbook was out of date and pointed to a decommissioned dashboard. Finally, alerting thresholds had been silenced two weeks prior during a noisy deploy and never re-enabled.",
     "question": "Summarize the three contributing factors to the outage.",
