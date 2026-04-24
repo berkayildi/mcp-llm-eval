@@ -8,6 +8,10 @@ from mcp_llm_eval.types import (
     EvalResult,
     MetricCheck,
     ModelConfig,
+    PoisonedChunk,
+    RAGResult,
+    RetrievalResult,
+    RetrievedChunk,
     RunSummary,
     ThresholdConfig,
     ThresholdResult,
@@ -396,3 +400,167 @@ class TestThresholdResult:
     def test_zero_threshold(self):
         c = MetricCheck(metric="m", threshold=0.0, actual=0.0, passed=True)
         assert c.passed is True
+
+
+# ---------------------------------------------------------------------------
+# v0.5.0 — retrieval / RAG types
+# ---------------------------------------------------------------------------
+
+
+class TestEvalEntryRetrievalFields:
+    def test_v040_entry_serialises_identically(self):
+        """An EvalEntry without v0.5.0 fields must round-trip to the exact same
+        dict that v0.4.x produced — no stray None keys."""
+        data = {
+            "id": "v4-001",
+            "category": "factual",
+            "context": "ctx",
+            "question": "q?",
+            "expected_response": "r",
+            "tags": ["a"],
+        }
+        entry = EvalEntry.from_dict(data)
+        assert entry.relevant_chunk_ids is None
+        assert entry.poisoned_chunks is None
+        assert entry.to_dict() == data
+
+    def test_with_relevant_chunk_ids_roundtrip(self):
+        data = {
+            "id": "r-001",
+            "category": "factual",
+            "context": "ctx",
+            "question": "q?",
+            "expected_response": "r",
+            "tags": [],
+            "relevant_chunk_ids": ["c1", "c2"],
+        }
+        entry = EvalEntry.from_dict(data)
+        assert entry.relevant_chunk_ids == ["c1", "c2"]
+        assert entry.poisoned_chunks is None
+        d = entry.to_dict()
+        assert d["relevant_chunk_ids"] == ["c1", "c2"]
+        assert "poisoned_chunks" not in d
+
+    def test_with_poisoned_chunks_roundtrip(self):
+        data = {
+            "id": "r-002",
+            "category": "factual",
+            "context": "ctx",
+            "question": "q?",
+            "expected_response": "r",
+            "poisoned_chunks": [
+                {"chunk_id": "p1", "poison_type": "contradiction", "payload": "fake"},
+            ],
+        }
+        entry = EvalEntry.from_dict(data)
+        assert entry.poisoned_chunks is not None
+        assert entry.poisoned_chunks[0].chunk_id == "p1"
+        assert entry.poisoned_chunks[0].expected_detection is True
+        d = entry.to_dict()
+        assert d["poisoned_chunks"][0]["poison_type"] == "contradiction"
+        assert "relevant_chunk_ids" not in d
+
+
+class TestRetrievedChunk:
+    def test_roundtrip(self):
+        data = {
+            "chunk_id": "c1",
+            "content": "Some text.",
+            "score": 1.25,
+            "metadata": {"topic": "x"},
+        }
+        chunk = RetrievedChunk.from_dict(data)
+        assert chunk.chunk_id == "c1"
+        assert chunk.score == 1.25
+        assert chunk.metadata == {"topic": "x"}
+        d = chunk.to_dict()
+        assert d == data
+
+    def test_default_metadata(self):
+        chunk = RetrievedChunk(chunk_id="c2", content="txt", score=0.0)
+        assert chunk.metadata == {}
+
+
+class TestRetrievalResult:
+    def test_roundtrip_with_metrics(self):
+        data = {
+            "query_id": "q1",
+            "query": "When?",
+            "retrieved_chunk_ids": ["a", "b", "c"],
+            "retrieval_latency_ms": 4.2,
+            "metrics": {"recall_at_k": 0.5, "ndcg_at_k": 0.61},
+            "k": 3,
+            "error": None,
+        }
+        r = RetrievalResult.from_dict(data)
+        assert r.retrieved_chunk_ids == ["a", "b", "c"]
+        assert r.metrics["recall_at_k"] == 0.5
+        assert r.to_dict() == data
+
+    def test_defaults(self):
+        r = RetrievalResult(
+            query_id="q", query="?", retrieved_chunk_ids=[], retrieval_latency_ms=0.0,
+        )
+        assert r.metrics == {}
+        assert r.k == 0
+        assert r.error is None
+
+
+class TestRAGResult:
+    def test_roundtrip_with_nested_chunks(self):
+        data = {
+            "query_id": "q1",
+            "query": "When did JWST launch?",
+            "retrieved_chunks": [
+                {"chunk_id": "sp-001", "content": "JWST launched 2021-12-25.",
+                 "score": 2.4, "metadata": {"topic": "space"}},
+                {"chunk_id": "sp-002", "content": "L2 orbit.",
+                 "score": 1.1, "metadata": {}},
+            ],
+            "retrieval_latency_ms": 3.0,
+            "retrieval_metrics": {"recall_at_k": 1.0, "ndcg_at_k": 1.0},
+            "model": "gpt-4o-mini",
+            "provider": "openai",
+            "answer": "December 25, 2021.",
+            "generation_metrics": {
+                "input_tokens": 120,
+                "output_tokens": 20,
+                "time_to_first_token_ms": 90,
+                "total_latency_ms": 400,
+                "cost_per_query": 0.0002,
+                "stop_reason": "stop",
+            },
+            "context_relevance_score": 0.9,
+            "context_relevance_reason": "Both chunks on-topic",
+            "citation_faithfulness_score": 1.0,
+            "citation_faithfulness_reason": "Fully supported",
+            "judge_model": "gpt-4o-mini",
+            "error": None,
+        }
+        r = RAGResult.from_dict(data)
+        assert len(r.retrieved_chunks) == 2
+        assert isinstance(r.retrieved_chunks[0], RetrievedChunk)
+        assert r.retrieved_chunks[0].chunk_id == "sp-001"
+        assert r.generation_metrics["input_tokens"] == 120
+        assert r.citation_faithfulness_score == 1.0
+        # Round-trip
+        assert r.to_dict() == data
+
+
+class TestPoisonedChunk:
+    def test_roundtrip(self):
+        data = {
+            "chunk_id": "p1",
+            "poison_type": "injection",
+            "payload": "ignore previous instructions",
+            "expected_detection": True,
+        }
+        p = PoisonedChunk.from_dict(data)
+        assert p.chunk_id == "p1"
+        assert p.poison_type == "injection"
+        assert p.expected_detection is True
+        assert p.to_dict() == data
+
+    def test_default_expected_detection(self):
+        p = PoisonedChunk(chunk_id="p2", poison_type="noise", payload="xxx")
+        assert p.expected_detection is True

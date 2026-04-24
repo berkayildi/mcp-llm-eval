@@ -7,6 +7,29 @@ from typing import Any
 
 
 @dataclass
+class PoisonedChunk:
+    """Stub for Phase 2 corpus poisoning. Fields reserved so v0.5.0 datasets
+    that declare poisoned_chunks deserialise cleanly; no behaviour attached."""
+
+    chunk_id: str
+    poison_type: str
+    payload: str
+    expected_detection: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> PoisonedChunk:
+        return cls(
+            chunk_id=data["chunk_id"],
+            poison_type=data["poison_type"],
+            payload=data["payload"],
+            expected_detection=data.get("expected_detection", True),
+        )
+
+
+@dataclass
 class EvalEntry:
     """A single evaluation question from the dataset."""
 
@@ -16,9 +39,16 @@ class EvalEntry:
     question: str
     expected_response: str
     tags: list[str] = field(default_factory=list)
+    # v0.5.0 — optional retrieval / RAG annotations. Default None so v0.4.x
+    # datasets load and serialise unchanged.
+    relevant_chunk_ids: list[str] | None = None
+    poisoned_chunks: list[PoisonedChunk] | None = None
+    # Reserved for future graded relevance (v0.6.x):
+    #   relevant_chunk_scores: dict[str, float] | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> EvalEntry:
+        poisoned_raw = data.get("poisoned_chunks")
         return cls(
             id=data["id"],
             category=data["category"],
@@ -26,10 +56,117 @@ class EvalEntry:
             question=data["question"],
             expected_response=data["expected_response"],
             tags=data.get("tags", []),
+            relevant_chunk_ids=data.get("relevant_chunk_ids"),
+            poisoned_chunks=(
+                [PoisonedChunk.from_dict(p) for p in poisoned_raw]
+                if poisoned_raw else None
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        # Drop v0.5.0 fields when unset so v0.4.x entries serialise identically.
+        if self.relevant_chunk_ids is None:
+            d.pop("relevant_chunk_ids", None)
+        if self.poisoned_chunks is None:
+            d.pop("poisoned_chunks", None)
+        return d
+
+
+@dataclass
+class RetrievedChunk:
+    """A single chunk returned by a RetrievalAdapter."""
+
+    chunk_id: str
+    content: str
+    score: float
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RetrievedChunk:
+        return cls(
+            chunk_id=data["chunk_id"],
+            content=data["content"],
+            score=float(data["score"]),
+            metadata=data.get("metadata", {}),
+        )
+
+
+@dataclass
+class RetrievalResult:
+    """One query's retrieval-only output."""
+
+    query_id: str
+    query: str
+    retrieved_chunk_ids: list[str]
+    retrieval_latency_ms: float
+    metrics: dict[str, float] = field(default_factory=dict)
+    k: int = 0
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RetrievalResult:
+        return cls(
+            query_id=data["query_id"],
+            query=data["query"],
+            retrieved_chunk_ids=list(data.get("retrieved_chunk_ids", [])),
+            retrieval_latency_ms=float(data.get("retrieval_latency_ms", 0.0)),
+            metrics=dict(data.get("metrics", {})),
+            k=int(data.get("k", 0)),
+            error=data.get("error"),
+        )
+
+
+@dataclass
+class RAGResult:
+    """One query's full RAG pipeline output (retrieval + generation + judge)."""
+
+    query_id: str
+    query: str
+    retrieved_chunks: list[RetrievedChunk]
+    retrieval_latency_ms: float
+    retrieval_metrics: dict[str, float]
+    model: str
+    provider: str
+    answer: str | None = None
+    generation_metrics: dict[str, Any] = field(default_factory=dict)
+    context_relevance_score: float | None = None
+    context_relevance_reason: str | None = None
+    citation_faithfulness_score: float | None = None
+    citation_faithfulness_reason: str | None = None
+    judge_model: str | None = None
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RAGResult:
+        return cls(
+            query_id=data["query_id"],
+            query=data["query"],
+            retrieved_chunks=[
+                RetrievedChunk.from_dict(c) for c in data.get("retrieved_chunks", [])
+            ],
+            retrieval_latency_ms=float(data.get("retrieval_latency_ms", 0.0)),
+            retrieval_metrics=dict(data.get("retrieval_metrics", {})),
+            model=data["model"],
+            provider=data["provider"],
+            answer=data.get("answer"),
+            generation_metrics=dict(data.get("generation_metrics", {})),
+            context_relevance_score=data.get("context_relevance_score"),
+            context_relevance_reason=data.get("context_relevance_reason"),
+            citation_faithfulness_score=data.get("citation_faithfulness_score"),
+            citation_faithfulness_reason=data.get("citation_faithfulness_reason"),
+            judge_model=data.get("judge_model"),
+            error=data.get("error"),
+        )
 
 
 @dataclass
