@@ -1,0 +1,12 @@
+{"chunk_id": "py-001", "content": "PyPI is the Python Package Index, launched in 2002 as the official third-party software repository for Python.", "metadata": {"topic": "python"}}
+{"chunk_id": "py-002", "content": "Poetry is a dependency manager for Python projects that handles virtual environments, lockfiles, and publishing.", "metadata": {"topic": "python"}}
+{"chunk_id": "py-003", "content": "pytest is the most widely used Python test framework, known for fixtures, parametrisation, and a rich plugin ecosystem.", "metadata": {"topic": "python"}}
+{"chunk_id": "py-004", "content": "Type hints were introduced in Python 3.5 via PEP 484 and are checked statically by tools like mypy and pyright.", "metadata": {"topic": "python"}}
+{"chunk_id": "sp-001", "content": "The James Webb Space Telescope launched on December 25, 2021 from French Guiana on an Ariane 5 rocket.", "metadata": {"topic": "space"}}
+{"chunk_id": "sp-002", "content": "JWST orbits the Sun at the L2 Lagrange point, approximately 1.5 million kilometres from Earth.", "metadata": {"topic": "space"}}
+{"chunk_id": "sp-003", "content": "Hubble was launched in 1990 and remains operational in low Earth orbit, having been serviced five times.", "metadata": {"topic": "space"}}
+{"chunk_id": "sp-004", "content": "The primary mirror of JWST is 6.5 metres across and is made of 18 hexagonal beryllium segments coated in gold.", "metadata": {"topic": "space"}}
+{"chunk_id": "eu-001", "content": "The EU AI Act entered into force on August 1, 2024, becoming the first comprehensive AI law in the world.", "metadata": {"topic": "policy"}}
+{"chunk_id": "eu-002", "content": "AI systems are classified into four risk tiers under the EU AI Act: unacceptable, high, limited, and minimal.", "metadata": {"topic": "policy"}}
+{"chunk_id": "eu-003", "content": "General-purpose AI model obligations under the EU AI Act apply from August 2, 2025.", "metadata": {"topic": "policy"}}
+{"chunk_id": "eu-004", "content": "High-risk AI system rules under the EU AI Act take full effect from August 2, 2026.", "metadata": {"topic": "policy"}}

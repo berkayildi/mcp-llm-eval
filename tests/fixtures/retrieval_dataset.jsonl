@@ -1,0 +1,4 @@
+{"id": "r-001", "category": "factual", "context": "Answer questions about JWST.", "question": "When did the James Webb Space Telescope launch?", "expected_response": "December 25, 2021.", "relevant_chunk_ids": ["sp-001"]}
+{"id": "r-002", "category": "factual", "context": "Answer questions about JWST.", "question": "Where does JWST orbit and how big is its primary mirror?", "expected_response": "L2 Lagrange point; 6.5 metre primary mirror.", "relevant_chunk_ids": ["sp-002", "sp-004"]}
+{"id": "r-003", "category": "factual", "context": "Answer questions about EU AI policy.", "question": "When do EU AI Act general-purpose AI obligations apply?", "expected_response": "August 2, 2025.", "relevant_chunk_ids": ["eu-001", "eu-003"]}
+{"id": "r-004", "category": "factual", "context": "Answer questions about Python tooling.", "question": "What year did the Python Package Index launch?", "expected_response": "2002.", "relevant_chunk_ids": ["py-001"]}
