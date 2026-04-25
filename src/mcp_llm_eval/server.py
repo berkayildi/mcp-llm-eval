@@ -209,6 +209,143 @@ async def list_tools() -> list[types.Tool]:
             },
         ),
         types.Tool(
+            name="evaluate_retrieval",
+            description=(
+                "Run retrieval metrics (recall@k, precision@k, MRR, nDCG@k) against "
+                "a labelled dataset with a configurable retrieval adapter. Returns "
+                "per-query metrics, dataset-level aggregate, and p50/p95 retrieval "
+                "latency."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "dataset_path": {
+                        "type": "string",
+                        "description": "Path to JSONL dataset with relevant_chunk_ids on each entry.",
+                    },
+                    "corpus_path": {
+                        "type": "string",
+                        "description": "Path to JSONL corpus file.",
+                    },
+                    "k": {
+                        "type": "integer",
+                        "description": "Top-k cutoff for all metrics (default 5).",
+                        "default": 5,
+                    },
+                    "adapter": {
+                        "type": "string",
+                        "enum": ["bm25"],
+                        "description": "Retrieval adapter to use (default bm25).",
+                        "default": "bm25",
+                    },
+                    "output_dir": {
+                        "type": "string",
+                        "description": "Directory to save results (optional).",
+                    },
+                },
+                "required": ["dataset_path", "corpus_path"],
+            },
+        ),
+        types.Tool(
+            name="evaluate_rag_end_to_end",
+            description=(
+                "Run the full RAG pipeline: retrieve chunks, generate answers using "
+                "the retrieved chunks as context, and score with context_relevance "
+                "and citation_faithfulness judges. Returns retrieval metrics, "
+                "generation metrics, and judge scores per query, plus an aggregate."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "dataset_path": {"type": "string"},
+                    "corpus_path": {"type": "string"},
+                    "models": {
+                        "type": "array",
+                        "description": "Models to evaluate.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "provider": {
+                                    "type": "string",
+                                    "enum": ["anthropic", "openai", "google"],
+                                },
+                                "model": {"type": "string"},
+                                "max_tokens": {"type": "integer", "default": 500},
+                                "input_cost_per_mtok": {"type": "number", "default": 0.0},
+                                "output_cost_per_mtok": {"type": "number", "default": 0.0},
+                            },
+                            "required": ["provider", "model"],
+                        },
+                    },
+                    "k": {"type": "integer", "default": 5},
+                    "adapter": {
+                        "type": "string",
+                        "enum": ["bm25"],
+                        "default": "bm25",
+                    },
+                    "judge": {
+                        "type": "object",
+                        "properties": {
+                            "provider": {"type": "string"},
+                            "model": {"type": "string"},
+                            "temperature": {"type": "number"},
+                        },
+                    },
+                    "output_dir": {"type": "string"},
+                },
+                "required": ["dataset_path", "corpus_path", "models"],
+            },
+        ),
+        types.Tool(
+            name="check_retrieval_drift",
+            description=(
+                "Compare two retrieval evaluation result files and detect drift. "
+                "Flags metrics that have regressed beyond configurable tolerance. "
+                "Takes two result-set paths; does not persist history itself."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "baseline_path": {"type": "string"},
+                    "current_path": {"type": "string"},
+                    "tolerance": {
+                        "type": "object",
+                        "properties": {
+                            "recall_at_k": {"type": "number", "default": 0.05},
+                            "precision_at_k": {"type": "number", "default": 0.05},
+                            "mrr": {"type": "number", "default": 0.05},
+                            "ndcg_at_k": {"type": "number", "default": 0.05},
+                            "context_relevance": {"type": "number", "default": 0.05},
+                            "citation_faithfulness": {"type": "number", "default": 0.05},
+                            "p95_latency_ms": {"type": "integer", "default": 50},
+                        },
+                    },
+                },
+                "required": ["baseline_path", "current_path"],
+            },
+        ),
+        types.Tool(
+            name="simulate_poisoned_corpus",
+            description=(
+                "[STUB - not implemented in v0.5.0] Inject poisoned chunks into a "
+                "corpus and re-run retrieval evaluation. Returns a clear "
+                "not-implemented response."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "dataset_path": {"type": "string"},
+                    "corpus_path": {"type": "string"},
+                    "poisoning_strategy": {
+                        "type": "string",
+                        "enum": ["contradiction", "injection", "noise"],
+                    },
+                    "poison_ratio": {"type": "number"},
+                },
+                "required": ["dataset_path", "corpus_path", "poisoning_strategy"],
+            },
+        ),
+        types.Tool(
             name="format_pr_comment",
             description=(
                 "Generate a markdown PR comment from evaluation results. "
@@ -268,6 +405,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextCont
         return await _compare_runs(arguments)
     if name == "format_pr_comment":
         return await _format_pr_comment(arguments)
+    if name == "evaluate_retrieval":
+        return await _evaluate_retrieval(arguments)
+    if name == "evaluate_rag_end_to_end":
+        return await _evaluate_rag_end_to_end(arguments)
+    if name == "check_retrieval_drift":
+        return await _check_retrieval_drift_tool(arguments)
+    if name == "simulate_poisoned_corpus":
+        return await _simulate_poisoned_corpus(arguments)
     raise ValueError(f"Unknown tool: {name}")
 
 
@@ -418,6 +563,102 @@ async def _format_pr_comment(arguments: dict[str, Any]) -> list[types.TextConten
 
     markdown = format_pr_comment(summary, comparison=comparison, thresholds=thresholds)
     return [types.TextContent(type="text", text=markdown)]
+
+
+async def _evaluate_retrieval(arguments: dict[str, Any]) -> list[types.TextContent]:
+    dataset_path = arguments["dataset_path"]
+    corpus_path = arguments["corpus_path"]
+    k = int(arguments.get("k", 5))
+    adapter = arguments.get("adapter", "bm25")
+    output_dir = arguments.get("output_dir")
+
+    try:
+        summary = engine.run_retrieval_evaluation(
+            dataset_path=dataset_path,
+            corpus_path=corpus_path,
+            k=k,
+            adapter=adapter,
+            output_dir=output_dir,
+        )
+    except Exception as e:
+        return [types.TextContent(type="text", text=f"Error: {e}")]
+
+    if "error" in summary:
+        return [types.TextContent(type="text", text=f"Error: {summary['error']}")]
+
+    return [types.TextContent(type="text", text=json.dumps(summary, indent=2))]
+
+
+async def _evaluate_rag_end_to_end(
+    arguments: dict[str, Any],
+) -> list[types.TextContent]:
+    dataset_path = arguments["dataset_path"]
+    corpus_path = arguments["corpus_path"]
+    models_raw = arguments["models"]
+    k = int(arguments.get("k", 5))
+    adapter = arguments.get("adapter", "bm25")
+    judge_config = arguments.get("judge")
+    output_dir = arguments.get("output_dir")
+
+    model_configs = [ModelConfig.from_dict(m) for m in models_raw]
+
+    try:
+        summary = engine.run_rag_evaluation(
+            dataset_path=dataset_path,
+            corpus_path=corpus_path,
+            models=model_configs,
+            k=k,
+            adapter=adapter,
+            judge_config=judge_config,
+            output_dir=output_dir,
+        )
+    except Exception as e:
+        return [types.TextContent(type="text", text=f"Error: {e}")]
+
+    if "error" in summary:
+        return [types.TextContent(type="text", text=f"Error: {summary['error']}")]
+
+    return [types.TextContent(type="text", text=json.dumps(summary, indent=2))]
+
+
+async def _check_retrieval_drift_tool(
+    arguments: dict[str, Any],
+) -> list[types.TextContent]:
+    baseline_path = arguments["baseline_path"]
+    current_path = arguments["current_path"]
+    tolerance = arguments.get("tolerance")
+
+    bp = Path(baseline_path)
+    cp = Path(current_path)
+    if not bp.exists():
+        return [types.TextContent(type="text", text=f"File not found: {baseline_path}")]
+    if not cp.exists():
+        return [types.TextContent(type="text", text=f"File not found: {current_path}")]
+
+    try:
+        baseline = json.loads(bp.read_text(encoding="utf-8"))
+        current = json.loads(cp.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        return [types.TextContent(type="text", text=f"Error reading files: {e}")]
+
+    result = engine.check_retrieval_drift(baseline, current, tolerance)
+    return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
+async def _simulate_poisoned_corpus(
+    arguments: dict[str, Any],
+) -> list[types.TextContent]:
+    return [types.TextContent(
+        type="text",
+        text=json.dumps({
+            "status": "not_implemented",
+            "message": (
+                "simulate_poisoned_corpus is a reserved stub in v0.5.0. "
+                "Implementation lands in v0.6.x."
+            ),
+            "accepted_arguments": list(arguments.keys()),
+        }, indent=2),
+    )]
 
 
 def main() -> None:

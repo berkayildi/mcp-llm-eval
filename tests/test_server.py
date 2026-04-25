@@ -8,12 +8,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_llm_eval.server import (
+    _check_retrieval_drift_tool,
     _check_thresholds,
     _compare_runs,
+    _evaluate_rag_end_to_end,
+    _evaluate_retrieval,
     _format_pr_comment,
     _get_evaluation,
     _list_evaluations,
     _run_evaluation,
+    _simulate_poisoned_corpus,
     app,
     call_tool,
     list_tools,
@@ -29,16 +33,20 @@ SAMPLE_DATASET = FIXTURES_DIR / "sample_dataset.json"
 
 
 class TestToolRegistration:
-    async def test_list_tools_returns_six(self):
+    async def test_list_tools_returns_ten(self):
         tools = await list_tools()
-        assert len(tools) == 6
+        assert len(tools) == 10
 
     async def test_tool_names(self):
         tools = await list_tools()
         names = {t.name for t in tools}
         assert names == {
+            # v0.4.x
             "run_evaluation", "check_thresholds", "list_evaluations",
             "get_evaluation", "compare_runs", "format_pr_comment",
+            # v0.5.0
+            "evaluate_retrieval", "evaluate_rag_end_to_end",
+            "check_retrieval_drift", "simulate_poisoned_corpus",
         }
 
     async def test_run_evaluation_schema(self):
@@ -563,3 +571,183 @@ class TestFormatPrCommentTool:
 class TestServerApp:
     def test_app_name(self):
         assert app.name == "mcp-llm-eval"
+
+
+# ---------------------------------------------------------------------------
+# v0.5.0 — schema for new MCP tools
+# ---------------------------------------------------------------------------
+
+
+class TestRetrievalToolSchemas:
+    async def test_evaluate_retrieval_schema(self):
+        tools = await list_tools()
+        tool = next(t for t in tools if t.name == "evaluate_retrieval")
+        schema = tool.inputSchema
+        assert "dataset_path" in schema["required"]
+        assert "corpus_path" in schema["required"]
+        assert schema["properties"]["adapter"]["enum"] == ["bm25"]
+
+    async def test_evaluate_rag_schema(self):
+        tools = await list_tools()
+        tool = next(t for t in tools if t.name == "evaluate_rag_end_to_end")
+        schema = tool.inputSchema
+        assert {"dataset_path", "corpus_path", "models"} <= set(schema["required"])
+
+    async def test_drift_schema(self):
+        tools = await list_tools()
+        tool = next(t for t in tools if t.name == "check_retrieval_drift")
+        schema = tool.inputSchema
+        assert "baseline_path" in schema["required"]
+        assert "current_path" in schema["required"]
+        assert "tolerance" in schema["properties"]
+
+    async def test_poisoned_stub_schema(self):
+        tools = await list_tools()
+        tool = next(t for t in tools if t.name == "simulate_poisoned_corpus")
+        schema = tool.inputSchema
+        assert "STUB" in tool.description
+        assert "poisoning_strategy" in schema["properties"]
+
+
+# ---------------------------------------------------------------------------
+# v0.5.0 — _evaluate_retrieval, _evaluate_rag_end_to_end, drift, stub
+# ---------------------------------------------------------------------------
+
+
+class TestEvaluateRetrievalTool:
+    @patch("mcp_llm_eval.server.engine")
+    async def test_returns_summary_json(self, mock_engine):
+        mock_engine.run_retrieval_evaluation.return_value = {
+            "timestamp": "20260424_120000",
+            "k": 5,
+            "total_queries": 3,
+            "total_errors": 0,
+            "aggregate": {"avg_recall_at_k": 0.9},
+            "per_query": [],
+        }
+        result = await _evaluate_retrieval({
+            "dataset_path": "ds.jsonl",
+            "corpus_path": "corpus.jsonl",
+            "k": 5,
+        })
+        body = json.loads(result[0].text)
+        assert body["aggregate"]["avg_recall_at_k"] == 0.9
+        mock_engine.run_retrieval_evaluation.assert_called_once()
+
+    @patch("mcp_llm_eval.server.engine")
+    async def test_engine_error_returned_as_text(self, mock_engine):
+        mock_engine.run_retrieval_evaluation.return_value = {"error": "boom"}
+        result = await _evaluate_retrieval({
+            "dataset_path": "ds.jsonl",
+            "corpus_path": "corpus.jsonl",
+        })
+        assert result[0].text.startswith("Error:")
+        assert "boom" in result[0].text
+
+    @patch("mcp_llm_eval.server.engine")
+    async def test_engine_exception_caught(self, mock_engine):
+        mock_engine.run_retrieval_evaluation.side_effect = RuntimeError("kaboom")
+        result = await _evaluate_retrieval({
+            "dataset_path": "ds.jsonl",
+            "corpus_path": "corpus.jsonl",
+        })
+        assert result[0].text.startswith("Error:")
+
+
+class TestEvaluateRagTool:
+    @patch("mcp_llm_eval.server.engine")
+    async def test_runs_with_models(self, mock_engine):
+        mock_engine.run_rag_evaluation.return_value = {
+            "timestamp": "t",
+            "total_queries": 1,
+            "total_model_runs": 1,
+            "total_errors": 0,
+            "overall": {"gpt-4o-mini": {"avg_recall_at_k": 1.0}},
+            "per_query": [],
+        }
+        result = await _evaluate_rag_end_to_end({
+            "dataset_path": "ds.jsonl",
+            "corpus_path": "corpus.jsonl",
+            "models": [{"provider": "openai", "model": "gpt-4o-mini"}],
+            "k": 3,
+        })
+        body = json.loads(result[0].text)
+        assert "overall" in body
+        call_kwargs = mock_engine.run_rag_evaluation.call_args[1]
+        assert call_kwargs["k"] == 3
+        # ModelConfig was constructed
+        assert call_kwargs["models"][0].provider == "openai"
+
+    @patch("mcp_llm_eval.server.engine")
+    async def test_engine_error_returned(self, mock_engine):
+        mock_engine.run_rag_evaluation.return_value = {"error": "no labels"}
+        result = await _evaluate_rag_end_to_end({
+            "dataset_path": "ds.jsonl",
+            "corpus_path": "corpus.jsonl",
+            "models": [{"provider": "openai", "model": "gpt-4o-mini"}],
+        })
+        assert "no labels" in result[0].text
+
+
+class TestCheckRetrievalDriftTool:
+    async def test_compares_two_files(self, tmp_path):
+        baseline_path = tmp_path / "baseline.json"
+        current_path = tmp_path / "current.json"
+        baseline_path.write_text(json.dumps({
+            "timestamp": "b",
+            "aggregate": {"avg_recall_at_k": 0.80, "p95_retrieval_latency_ms": 5.0},
+        }))
+        current_path.write_text(json.dumps({
+            "timestamp": "c",
+            "aggregate": {"avg_recall_at_k": 0.65, "p95_retrieval_latency_ms": 5.0},
+        }))
+        result = await _check_retrieval_drift_tool({
+            "baseline_path": str(baseline_path),
+            "current_path": str(current_path),
+        })
+        body = json.loads(result[0].text)
+        assert body["has_regressions"] is True
+        assert body["metrics"]["avg_recall_at_k"]["regression"] is True
+
+    async def test_baseline_missing_returns_error(self, tmp_path):
+        current_path = tmp_path / "c.json"
+        current_path.write_text("{}")
+        result = await _check_retrieval_drift_tool({
+            "baseline_path": str(tmp_path / "missing.json"),
+            "current_path": str(current_path),
+        })
+        assert "not found" in result[0].text
+
+
+class TestSimulatePoisonedCorpus:
+    async def test_returns_not_implemented(self):
+        result = await _simulate_poisoned_corpus({
+            "dataset_path": "ds.jsonl",
+            "corpus_path": "corpus.jsonl",
+            "poisoning_strategy": "contradiction",
+        })
+        body = json.loads(result[0].text)
+        assert body["status"] == "not_implemented"
+        assert "v0.6.x" in body["message"]
+        assert "poisoning_strategy" in body["accepted_arguments"]
+
+
+class TestRoutingRetrievalTools:
+    async def test_routes_evaluate_retrieval(self):
+        with patch("mcp_llm_eval.server.engine") as mock_engine:
+            mock_engine.run_retrieval_evaluation.return_value = {
+                "timestamp": "t", "aggregate": {}, "per_query": [],
+                "k": 5, "total_queries": 0, "total_errors": 0,
+            }
+            await call_tool("evaluate_retrieval", {
+                "dataset_path": "ds.jsonl", "corpus_path": "corpus.jsonl",
+            })
+            mock_engine.run_retrieval_evaluation.assert_called_once()
+
+    async def test_routes_simulate_poisoned_corpus(self):
+        result = await call_tool("simulate_poisoned_corpus", {
+            "dataset_path": "ds.jsonl", "corpus_path": "corpus.jsonl",
+            "poisoning_strategy": "noise",
+        })
+        body = json.loads(result[0].text)
+        assert body["status"] == "not_implemented"
