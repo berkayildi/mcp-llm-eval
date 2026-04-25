@@ -381,3 +381,226 @@ thresholds:
         with pytest.raises(SystemExit) as exc_info:
             cli_main(["comment"])
         assert exc_info.value.code == 2  # argparse error
+
+
+# ---------------------------------------------------------------------------
+# v0.5.0 — evaluate-retrieval subcommand
+# ---------------------------------------------------------------------------
+
+
+class TestCmdEvaluateRetrieval:
+    def test_help(self):
+        with pytest.raises(SystemExit) as exc_info:
+            cli_main(["evaluate-retrieval", "--help"])
+        assert exc_info.value.code == 0
+
+    def test_missing_required_args(self):
+        with pytest.raises(SystemExit) as exc_info:
+            cli_main(["evaluate-retrieval"])
+        assert exc_info.value.code == 2  # argparse error
+
+    @patch("mcp_llm_eval.cli.engine")
+    def test_happy_path(self, mock_engine, capsys):
+        mock_engine.run_retrieval_evaluation.return_value = {
+            "timestamp": "20260424_120000",
+            "k": 5,
+            "adapter": "bm25",
+            "total_queries": 3,
+            "total_errors": 0,
+            "aggregate": {
+                "avg_recall_at_k": 0.82,
+                "avg_precision_at_k": 0.64,
+                "avg_mrr": 0.76,
+                "avg_ndcg_at_k": 0.79,
+                "p50_retrieval_latency_ms": 3.2,
+                "p95_retrieval_latency_ms": 7.8,
+            },
+        }
+        cli_main([
+            "evaluate-retrieval",
+            "--dataset", "ds.jsonl",
+            "--corpus", "corpus.jsonl",
+            "--k", "5",
+        ])
+        out = capsys.readouterr().out
+        assert "Retrieval evaluation" in out
+        assert "0.8200" in out
+        mock_engine.run_retrieval_evaluation.assert_called_once()
+
+    @patch("mcp_llm_eval.cli.engine")
+    def test_engine_error_exits_1(self, mock_engine):
+        mock_engine.run_retrieval_evaluation.return_value = {"error": "boom"}
+        with pytest.raises(SystemExit) as exc_info:
+            cli_main([
+                "evaluate-retrieval",
+                "--dataset", "ds.jsonl",
+                "--corpus", "corpus.jsonl",
+            ])
+        assert exc_info.value.code == 1
+
+    @patch("mcp_llm_eval.cli.engine")
+    def test_threshold_breach_exits_1(self, mock_engine, capsys):
+        # Engine returns a summary; thresholds in config break.
+        mock_engine.run_retrieval_evaluation.return_value = {
+            "timestamp": "t", "k": 5, "adapter": "bm25",
+            "total_queries": 1, "total_questions": 1,
+            "total_model_runs": 1, "total_errors": 0,
+            "total_elapsed_sec": 0.0, "total_estimated_cost": 0.0,
+            "judge_model": None,
+            "aggregate": {"avg_recall_at_k": 0.50},
+            "overall": {"_retrieval": {"avg_recall_at_k": 0.50}},
+            "by_category": {},
+            "results": [],
+            "per_query": [],
+        }
+        # Make engine.check_thresholds work normally
+        from mcp_llm_eval import engine as real_engine
+        mock_engine.check_thresholds.side_effect = real_engine.check_thresholds
+
+        config_yaml = """
+models:
+  - provider: openai
+    model: gpt-4o-mini
+thresholds:
+  avg_faithfulness: 0.99
+"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yml", delete=False
+        ) as f:
+            f.write(config_yaml)
+            f.flush()
+            try:
+                with pytest.raises(SystemExit) as exc_info:
+                    cli_main([
+                        "evaluate-retrieval",
+                        "--dataset", "ds.jsonl",
+                        "--corpus", "corpus.jsonl",
+                        "--config", f.name,
+                    ])
+                assert exc_info.value.code == 1
+            finally:
+                os.unlink(f.name)
+
+
+# ---------------------------------------------------------------------------
+# v0.5.0 — evaluate-rag subcommand
+# ---------------------------------------------------------------------------
+
+
+class TestCmdEvaluateRag:
+    def _rag_summary(self):
+        return {
+            "timestamp": "t",
+            "k": 5,
+            "adapter": "bm25",
+            "total_queries": 1,
+            "total_model_runs": 1,
+            "total_errors": 0,
+            "total_elapsed_sec": 1.0,
+            "total_estimated_cost": 0.001,
+            "judge_model": "gpt-4o-mini",
+            "overall": {"gpt-4o-mini": {
+                "avg_recall_at_k": 1.0,
+                "avg_ndcg_at_k": 1.0,
+                "avg_context_relevance": 0.9,
+                "avg_citation_faithfulness": 0.85,
+                "avg_ttft_ms": 100,
+                "avg_cost_per_query": 0.001,
+            }},
+            "by_category": {},
+            "per_query": [],
+            "results": [],
+        }
+
+    def test_no_models_no_config_exits_1(self, capsys):
+        with pytest.raises(SystemExit) as exc_info:
+            cli_main([
+                "evaluate-rag",
+                "--dataset", "ds.jsonl",
+                "--corpus", "corpus.jsonl",
+            ])
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "--model" in err and "--config" in err
+
+    def test_invalid_model_format(self, capsys):
+        with pytest.raises(SystemExit) as exc_info:
+            cli_main([
+                "evaluate-rag",
+                "--dataset", "ds.jsonl",
+                "--corpus", "corpus.jsonl",
+                "--model", "no-colon-format",
+            ])
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "provider:model" in err
+
+    @patch("mcp_llm_eval.cli.engine")
+    def test_model_flag_happy_path(self, mock_engine, capsys):
+        mock_engine.run_rag_evaluation.return_value = self._rag_summary()
+        cli_main([
+            "evaluate-rag",
+            "--dataset", "ds.jsonl",
+            "--corpus", "corpus.jsonl",
+            "--model", "openai:gpt-4o-mini",
+        ])
+        call_kwargs = mock_engine.run_rag_evaluation.call_args[1]
+        assert call_kwargs["models"][0].provider == "openai"
+        assert call_kwargs["models"][0].model == "gpt-4o-mini"
+
+    @patch("mcp_llm_eval.cli.engine")
+    def test_cli_model_overrides_config_models(self, mock_engine):
+        mock_engine.run_rag_evaluation.return_value = self._rag_summary()
+        config_yaml = """
+models:
+  - provider: anthropic
+    model: claude-sonnet-4-6
+"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yml", delete=False
+        ) as f:
+            f.write(config_yaml)
+            f.flush()
+            try:
+                cli_main([
+                    "evaluate-rag",
+                    "--dataset", "ds.jsonl",
+                    "--corpus", "corpus.jsonl",
+                    "--config", f.name,
+                    "--model", "openai:gpt-4o-mini",
+                ])
+                models_arg = mock_engine.run_rag_evaluation.call_args[1]["models"]
+                # CLI model wins, no merging
+                assert len(models_arg) == 1
+                assert models_arg[0].provider == "openai"
+                assert models_arg[0].model == "gpt-4o-mini"
+            finally:
+                os.unlink(f.name)
+
+    @patch("mcp_llm_eval.cli.engine")
+    def test_judge_model_flag_overrides_config(self, mock_engine):
+        mock_engine.run_rag_evaluation.return_value = self._rag_summary()
+        config_yaml = """
+models:
+  - provider: openai
+    model: gpt-4o-mini
+judge:
+  model: gpt-4o-mini
+"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yml", delete=False
+        ) as f:
+            f.write(config_yaml)
+            f.flush()
+            try:
+                cli_main([
+                    "evaluate-rag",
+                    "--dataset", "ds.jsonl",
+                    "--corpus", "corpus.jsonl",
+                    "--config", f.name,
+                    "--judge-model", "gpt-4o",
+                ])
+                jc = mock_engine.run_rag_evaluation.call_args[1]["judge_config"]
+                assert jc["model"] == "gpt-4o"
+            finally:
+                os.unlink(f.name)
