@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/berkayildi/mcp-llm-eval/compare/v0.5.0...v0.5.1) (2026-04-25)
+
+
+### Documentation
+
+* real benchmark numbers and status line in README ([3816a97](https://github.com/berkayildi/mcp-llm-eval/commit/3816a9709e9313203c173d418c6133ede18c0de8))
+* update README for v0.5.0 retrieval and RAG evaluation ([401fbca](https://github.com/berkayildi/mcp-llm-eval/commit/401fbca2c9e6edb92b2d13030895be675478f62d))
+
 ## [0.5.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.4.1...v0.5.0) (2026-04-25)
 
 
