@@ -4,6 +4,8 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
+> **Status:** stable. v0.5.0 published on PyPI, used in CI gates by [`mcp-content-pipeline`](https://github.com/berkayildi/mcp-content-pipeline). Live benchmarks at [llmshot.vercel.app](https://llmshot.vercel.app).
+
 A local **Model Context Protocol (MCP) server** that packages LLM evaluation gates as reusable CI/CD primitives. Run datasets against multiple models, score responses with an LLM-as-judge, and enforce quality thresholds — all through MCP tools that AI agents can call.
 
 ```mermaid
@@ -27,18 +29,18 @@ There's no unit test for LLM quality. Teams ship prompt changes, swap models, or
 
 ## Features
 
-| Tool | Description |
-|------|-------------|
-| `run_evaluation` | Load a dataset, query models via streaming, score with LLM-as-judge, return per-question scores and aggregate summary |
-| `check_thresholds` | Validate evaluation results against quality gates (faithfulness, relevance, TTFT, cost, retrieval, RAG) |
-| `list_evaluations` | List past evaluation runs with metadata (timestamp, models, cost, pass/fail) |
-| `get_evaluation` | Retrieve full details of a specific run (per-question scores, responses, judge reasoning) |
-| `compare_runs` | Compare two evaluation runs and detect regressions beyond configurable tolerance |
-| `format_pr_comment` | Generate a markdown PR comment from evaluation results with regression details and threshold status |
-| `evaluate_retrieval` | Run retrieval metrics (recall@k, precision@k, MRR, nDCG@k) against a labelled chunk dataset; returns per-query metrics, aggregate, p50/p95 latency |
-| `evaluate_rag_end_to_end` | Full RAG pipeline — retrieve, generate, score with `context_relevance` and `citation_faithfulness` judges |
-| `check_retrieval_drift` | Compare two retrieval result files and flag metrics that regressed beyond tolerance |
-| `simulate_poisoned_corpus` | Reserved stub for v0.6.x — schema is stable, returns a not-implemented response today |
+| Tool                       | Description                                                                                                                                        |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run_evaluation`           | Load a dataset, query models via streaming, score with LLM-as-judge, return per-question scores and aggregate summary                              |
+| `check_thresholds`         | Validate evaluation results against quality gates (faithfulness, relevance, TTFT, cost, retrieval, RAG)                                            |
+| `list_evaluations`         | List past evaluation runs with metadata (timestamp, models, cost, pass/fail)                                                                       |
+| `get_evaluation`           | Retrieve full details of a specific run (per-question scores, responses, judge reasoning)                                                          |
+| `compare_runs`             | Compare two evaluation runs and detect regressions beyond configurable tolerance                                                                   |
+| `format_pr_comment`        | Generate a markdown PR comment from evaluation results with regression details and threshold status                                                |
+| `evaluate_retrieval`       | Run retrieval metrics (recall@k, precision@k, MRR, nDCG@k) against a labelled chunk dataset; returns per-query metrics, aggregate, p50/p95 latency |
+| `evaluate_rag_end_to_end`  | Full RAG pipeline — retrieve, generate, score with `context_relevance` and `citation_faithfulness` judges                                          |
+| `check_retrieval_drift`    | Compare two retrieval result files and flag metrics that regressed beyond tolerance                                                                |
+| `simulate_poisoned_corpus` | Reserved stub for v0.6.x — schema is stable, returns a not-implemented response today                                                              |
 
 ### What it measures
 
@@ -79,10 +81,10 @@ pip install google-genai # for Gemini models
 
 Add this to your Claude Desktop MCP configuration file:
 
-| OS | Path |
-|----|------|
-| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+| OS      | Path                                                              |
+| ------- | ----------------------------------------------------------------- |
+| macOS   | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json`                     |
 
 **Recommended — with `uvx` (no install required):**
 
@@ -168,7 +170,7 @@ Fully quit (`Cmd+Q` on macOS) and reopen. Look for the tools icon to confirm the
 
 ## Example interaction
 
-Claude autonomously chains the tools — running the evaluation, then checking thresholds (numbers below are illustrative):
+Claude autonomously chains the tools — running the evaluation, then checking thresholds:
 
 ```
 Running evaluation...
@@ -177,16 +179,18 @@ Running evaluation...
 - Judge: gpt-4o-mini
 
 Results:
-  claude-sonnet-4-6: avg faithfulness=0.92, relevance=0.88, TTFT=340ms, cost=$0.0045/q
-  gpt-4o-mini:           avg faithfulness=0.85, relevance=0.82, TTFT=180ms, cost=$0.0003/q
+  claude-sonnet-4-6: avg faithfulness=0.83, relevance=0.83, TTFT=1367ms, cost=$0.0035/q
+  gpt-4o-mini:       avg faithfulness=0.94, relevance=0.94, TTFT=1194ms, cost=$0.0001/q
 
 Threshold check:
-  avg_faithfulness >= 0.80: PASS (actual: 0.885)
-  avg_relevance >= 0.75:    PASS (actual: 0.850)
-  p95_ttft_ms <= 500:       PASS (actual: 420ms)
-  max_cost_per_query <= 0.01: PASS (actual: $0.0045)
+  avg_faithfulness >= 0.80: PASS (actual: 0.889)
+  avg_relevance >= 0.75:    PASS (actual: 0.889)
+  p95_ttft_ms <= 2000:      PASS (actual: 1367ms)
+  max_cost_per_query <= 0.01: PASS (actual: $0.0035)
 
 Overall: PASS
+
+> Full benchmark across 5 models lives at https://llmshot.vercel.app (Eval Gates dataset).
 ```
 
 ---
@@ -197,7 +201,7 @@ Create an `.eval-gate.yml` in your project root for repeatable threshold configs
 
 ```yaml
 dataset: eval/dataset.json
-corpus:  eval/corpus.jsonl        # v0.5.0 — used by retrieval / RAG eval
+corpus: eval/corpus.jsonl # v0.5.0 — used by retrieval / RAG eval
 output_dir: eval/results
 
 models:
@@ -215,7 +219,7 @@ judge:
   model: gpt-4o-mini
   temperature: 0
 
-retrieval:                        # v0.5.0
+retrieval: # v0.5.0
   adapter: bm25
   k: 5
 
@@ -336,12 +340,12 @@ CLI `--model` flags fully override the config's `models:` list (no merging). Fil
 
 ### MCP tools
 
-| Tool | Purpose |
-|------|---------|
-| `evaluate_retrieval` | Run retrieval metrics against a labelled dataset; returns per-query metrics, aggregate, p50/p95 latency |
-| `evaluate_rag_end_to_end` | Retrieve + generate + judge in one call; returns per-(query, model) results plus per-model aggregates |
-| `check_retrieval_drift` | Compare two saved retrieval/RAG result files; flags metrics that regressed beyond tolerance |
-| `simulate_poisoned_corpus` | Reserved stub for v0.6.x; schema is stable today and returns a not-implemented response |
+| Tool                       | Purpose                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `evaluate_retrieval`       | Run retrieval metrics against a labelled dataset; returns per-query metrics, aggregate, p50/p95 latency |
+| `evaluate_rag_end_to_end`  | Retrieve + generate + judge in one call; returns per-(query, model) results plus per-model aggregates   |
+| `check_retrieval_drift`    | Compare two saved retrieval/RAG result files; flags metrics that regressed beyond tolerance             |
+| `simulate_poisoned_corpus` | Reserved stub for v0.6.x; schema is stable today and returns a not-implemented response                 |
 
 ### Pluggable retrievers
 
@@ -402,7 +406,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
       - run: pip install mcp-llm-eval anthropic openai google-genai
       - run: mcp-llm-eval run --config .eval-gate.yml --dataset eval/dataset.json --output-dir eval/results
         env:
@@ -460,6 +464,7 @@ at `text-generation/eval-gates-summary.json` and
 **"Provider SDK not installed" errors**
 
 Provider SDKs are optional. Install the ones you need:
+
 ```bash
 pip install anthropic openai google-genai
 ```
