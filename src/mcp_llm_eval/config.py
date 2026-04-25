@@ -80,17 +80,37 @@ def _validate_config(data: dict[str, Any]) -> dict[str, Any]:
         "temperature": judge_raw.get("temperature", 0),
     }
 
-    # thresholds (optional)
-    thresh_raw = data.get("thresholds", {})
+    # thresholds (optional) — v0.4.x + v0.5.0 keys, all optional
+    thresh_raw = data.get("thresholds", {}) or {}
     config["thresholds"] = {
+        # v0.4.x
         "avg_faithfulness": thresh_raw.get("avg_faithfulness"),
         "avg_relevance": thresh_raw.get("avg_relevance"),
         "p95_ttft_ms": thresh_raw.get("p95_ttft_ms"),
         "max_cost_per_query": thresh_raw.get("max_cost_per_query"),
+        # v0.5.0 — retrieval
+        "avg_recall_at_k": thresh_raw.get("avg_recall_at_k"),
+        "avg_precision_at_k": thresh_raw.get("avg_precision_at_k"),
+        "avg_mrr": thresh_raw.get("avg_mrr"),
+        "avg_ndcg_at_k": thresh_raw.get("avg_ndcg_at_k"),
+        "p95_retrieval_latency_ms": thresh_raw.get("p95_retrieval_latency_ms"),
+        # v0.5.0 — RAG
+        "avg_context_relevance": thresh_raw.get("avg_context_relevance"),
+        "avg_citation_faithfulness": thresh_raw.get("avg_citation_faithfulness"),
     }
 
     # output_dir (optional)
     config["output_dir"] = data.get("output_dir", "eval/results")
+
+    # corpus (optional, v0.5.0) — path to JSONL corpus
+    config["corpus"] = data.get("corpus")
+
+    # retrieval (optional, v0.5.0) — adapter and k for retrieval / RAG eval
+    retrieval_raw = data.get("retrieval", {}) or {}
+    config["retrieval"] = {
+        "adapter": retrieval_raw.get("adapter", "bm25"),
+        "k": retrieval_raw.get("k", 5),
+    }
 
     # tracing (optional)
     tracing_raw = data.get("tracing", {})

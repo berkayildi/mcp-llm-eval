@@ -367,6 +367,58 @@ def check_thresholds(summary: RunSummary, thresholds: ThresholdConfig) -> Thresh
             passed=max_cost <= thresholds.max_cost_per_query,
         ))
 
+    # ------------------------------------------------------------------
+    # v0.5.0 retrieval / RAG thresholds
+    # ------------------------------------------------------------------
+
+    def _retrieval_metric_actual(name: str) -> float | None:
+        """Average a retrieval/RAG metric across per-model ``overall`` blocks.
+
+        Both retrieval-only summaries (single synthetic ``_retrieval`` key) and
+        RAG summaries (one key per model) put the metric in ``overall[*][name]``,
+        so a single averaging path handles both.
+        """
+        per_model = [
+            v[name]
+            for v in summary.overall.values()
+            if isinstance(v, dict) and v.get(name) is not None
+        ]
+        if per_model:
+            return round(sum(per_model) / len(per_model), 4)
+        return None
+
+    _retrieval_min_thresholds = (
+        ("avg_recall_at_k", thresholds.avg_recall_at_k),
+        ("avg_precision_at_k", thresholds.avg_precision_at_k),
+        ("avg_mrr", thresholds.avg_mrr),
+        ("avg_ndcg_at_k", thresholds.avg_ndcg_at_k),
+        ("avg_context_relevance", thresholds.avg_context_relevance),
+        ("avg_citation_faithfulness", thresholds.avg_citation_faithfulness),
+    )
+    for metric_name, threshold in _retrieval_min_thresholds:
+        if threshold is None:
+            continue
+        actual = _retrieval_metric_actual(metric_name)
+        if actual is None:
+            actual = 0.0
+        checks.append(MetricCheck(
+            metric=metric_name,
+            threshold=float(threshold),
+            actual=float(actual),
+            passed=actual >= threshold,
+        ))
+
+    if thresholds.p95_retrieval_latency_ms is not None:
+        actual = _retrieval_metric_actual("p95_retrieval_latency_ms")
+        if actual is None:
+            actual = 0.0
+        checks.append(MetricCheck(
+            metric="p95_retrieval_latency_ms",
+            threshold=float(thresholds.p95_retrieval_latency_ms),
+            actual=float(actual),
+            passed=actual <= thresholds.p95_retrieval_latency_ms,
+        ))
+
     overall_pass = all(c.passed for c in checks) if checks else True
 
     return ThresholdResult(overall_pass=overall_pass, per_metric=checks)

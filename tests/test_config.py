@@ -195,3 +195,78 @@ class TestValidateConfig:
     def test_empty_models_list(self):
         with pytest.raises(ValueError, match="at least one model"):
             _validate_config({"models": []})
+
+
+# ---------------------------------------------------------------------------
+# v0.5.0 — corpus, retrieval, retrieval/RAG threshold keys
+# ---------------------------------------------------------------------------
+
+
+class TestV050ConfigKeys:
+    def test_v04_config_loads_unchanged(self):
+        cfg = _validate_config({
+            "models": [{"provider": "openai", "model": "gpt-4o-mini"}],
+            "thresholds": {"avg_faithfulness": 0.8, "avg_relevance": 0.7},
+        })
+        # v0.5.0 threshold keys default to None
+        assert cfg["thresholds"]["avg_recall_at_k"] is None
+        assert cfg["thresholds"]["avg_context_relevance"] is None
+        assert cfg["thresholds"]["p95_retrieval_latency_ms"] is None
+        # v0.4.x keys preserved
+        assert cfg["thresholds"]["avg_faithfulness"] == 0.8
+        # corpus and retrieval defaults
+        assert cfg["corpus"] is None
+        assert cfg["retrieval"] == {"adapter": "bm25", "k": 5}
+
+    def test_mixed_v04_and_v05_thresholds(self):
+        cfg = _validate_config({
+            "models": [{"provider": "openai", "model": "gpt-4o-mini"}],
+            "thresholds": {
+                # v0.4.x
+                "avg_faithfulness": 0.80,
+                "avg_relevance": 0.75,
+                "p95_ttft_ms": 500,
+                "max_cost_per_query": 0.01,
+                # v0.5.0 — retrieval
+                "avg_recall_at_k": 0.75,
+                "avg_precision_at_k": 0.50,
+                "avg_mrr": 0.70,
+                "avg_ndcg_at_k": 0.75,
+                "p95_retrieval_latency_ms": 50,
+                # v0.5.0 — RAG
+                "avg_context_relevance": 0.70,
+                "avg_citation_faithfulness": 0.80,
+            },
+        })
+        t = cfg["thresholds"]
+        assert t["avg_faithfulness"] == 0.80
+        assert t["avg_recall_at_k"] == 0.75
+        assert t["avg_context_relevance"] == 0.70
+        assert t["p95_retrieval_latency_ms"] == 50
+
+    def test_corpus_key_loaded(self):
+        cfg = _validate_config({
+            "models": [{"provider": "openai", "model": "gpt-4o-mini"}],
+            "corpus": "eval/corpus.jsonl",
+        })
+        assert cfg["corpus"] == "eval/corpus.jsonl"
+
+    def test_retrieval_block_overrides_defaults(self):
+        cfg = _validate_config({
+            "models": [{"provider": "openai", "model": "gpt-4o-mini"}],
+            "retrieval": {"adapter": "bm25", "k": 10},
+        })
+        assert cfg["retrieval"] == {"adapter": "bm25", "k": 10}
+
+    def test_threshold_config_from_dict_round_trips_v05(self):
+        from mcp_llm_eval.types import ThresholdConfig
+        t = ThresholdConfig.from_dict({
+            "avg_faithfulness": 0.8,
+            "avg_recall_at_k": 0.75,
+            "avg_context_relevance": 0.70,
+            "p95_retrieval_latency_ms": 50,
+        })
+        assert t.avg_faithfulness == 0.8
+        assert t.avg_recall_at_k == 0.75
+        assert t.avg_context_relevance == 0.70
+        assert t.p95_retrieval_latency_ms == 50

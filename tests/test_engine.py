@@ -986,3 +986,59 @@ class TestCheckRetrievalDrift:
         assert result["metrics"]["avg_recall_at_k"]["regression"] is True
 
 
+# ---------------------------------------------------------------------------
+# v0.5.0 — check_thresholds: retrieval / RAG metric extension
+# ---------------------------------------------------------------------------
+
+
+class TestCheckThresholdsRetrieval:
+    def _summary(self, overall):
+        return RunSummary(
+            timestamp="t", total_questions=1, total_model_runs=1,
+            total_errors=0, total_elapsed_sec=0.0, total_estimated_cost=0.0,
+            overall=overall,
+        )
+
+    def test_recall_threshold_pass(self):
+        summary = self._summary({"_retrieval": {"avg_recall_at_k": 0.90}})
+        thresholds = ThresholdConfig(avg_recall_at_k=0.80)
+        result = check_thresholds(summary, thresholds)
+        assert result.overall_pass is True
+        assert result.per_metric[0].metric == "avg_recall_at_k"
+
+    def test_recall_threshold_fail(self):
+        summary = self._summary({"_retrieval": {"avg_recall_at_k": 0.60}})
+        thresholds = ThresholdConfig(avg_recall_at_k=0.80)
+        result = check_thresholds(summary, thresholds)
+        assert result.overall_pass is False
+
+    def test_p95_retrieval_latency_fail(self):
+        summary = self._summary({"_retrieval": {"p95_retrieval_latency_ms": 200.0}})
+        thresholds = ThresholdConfig(p95_retrieval_latency_ms=50)
+        result = check_thresholds(summary, thresholds)
+        assert result.overall_pass is False
+        assert result.per_metric[0].actual == 200.0
+
+    def test_rag_thresholds_averaged_across_models(self):
+        summary = self._summary({
+            "model-a": {"avg_context_relevance": 0.90, "avg_citation_faithfulness": 0.80},
+            "model-b": {"avg_context_relevance": 0.70, "avg_citation_faithfulness": 0.60},
+        })
+        thresholds = ThresholdConfig(avg_context_relevance=0.75)
+        result = check_thresholds(summary, thresholds)
+        # avg = (0.90 + 0.70) / 2 = 0.80 >= 0.75
+        assert result.overall_pass is True
+
+    def test_missing_metric_treated_as_zero(self):
+        summary = self._summary({"_retrieval": {}})
+        thresholds = ThresholdConfig(avg_mrr=0.5)
+        result = check_thresholds(summary, thresholds)
+        assert result.per_metric[0].actual == 0.0
+        assert result.overall_pass is False
+
+    def test_v04_thresholds_still_work(self):
+        summary = self._summary({"m": {"avg_faithfulness": 0.9, "avg_relevance": 0.85}})
+        thresholds = ThresholdConfig(avg_faithfulness=0.8)
+        result = check_thresholds(summary, thresholds)
+        assert result.overall_pass is True
+        assert len(result.per_metric) == 1

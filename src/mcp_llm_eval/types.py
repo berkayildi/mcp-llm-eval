@@ -280,10 +280,20 @@ class RunSummary:
 class ThresholdConfig:
     """Quality gate thresholds."""
 
+    # v0.4.x — generation
     avg_faithfulness: float | None = None
     avg_relevance: float | None = None
     p95_ttft_ms: int | None = None
     max_cost_per_query: float | None = None
+    # v0.5.0 — retrieval
+    avg_recall_at_k: float | None = None
+    avg_precision_at_k: float | None = None
+    avg_mrr: float | None = None
+    avg_ndcg_at_k: float | None = None
+    p95_retrieval_latency_ms: int | None = None
+    # v0.5.0 — RAG
+    avg_context_relevance: float | None = None
+    avg_citation_faithfulness: float | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ThresholdConfig:
@@ -292,6 +302,13 @@ class ThresholdConfig:
             avg_relevance=data.get("avg_relevance"),
             p95_ttft_ms=data.get("p95_ttft_ms"),
             max_cost_per_query=data.get("max_cost_per_query"),
+            avg_recall_at_k=data.get("avg_recall_at_k"),
+            avg_precision_at_k=data.get("avg_precision_at_k"),
+            avg_mrr=data.get("avg_mrr"),
+            avg_ndcg_at_k=data.get("avg_ndcg_at_k"),
+            p95_retrieval_latency_ms=data.get("p95_retrieval_latency_ms"),
+            avg_context_relevance=data.get("avg_context_relevance"),
+            avg_citation_faithfulness=data.get("avg_citation_faithfulness"),
         )
 
     def to_dict(self) -> dict[str, Any]:
