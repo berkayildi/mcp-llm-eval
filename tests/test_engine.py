@@ -10,17 +10,25 @@ import pytest
 
 from mcp_llm_eval.engine import (
     _aggregate,
+    _build_retrieval_adapter,
+    _format_rag_system_prompt,
     _get_client,
     _get_runner,
+    _percentiles,
+    check_retrieval_drift,
     check_thresholds,
     load_dataset,
+    load_jsonl_dataset,
     run_evaluation,
+    run_rag_evaluation,
+    run_retrieval_evaluation,
 )
 from mcp_llm_eval.types import (
     EvalEntry,
     EvalResult,
     MetricCheck,
     ModelConfig,
+    RetrievedChunk,
     RunSummary,
     ThresholdConfig,
     ThresholdResult,
@@ -517,3 +525,464 @@ class TestRunEvaluation:
         # cost = (1000 * 2.5 + 500 * 10.0) / 1_000_000 = 0.0075
         result = summary.results[0]
         assert abs(result["cost_per_query"] - 0.0075) < 0.0001
+
+
+# ---------------------------------------------------------------------------
+# v0.5.0 — JSONL dataset loader
+# ---------------------------------------------------------------------------
+
+
+class TestLoadJsonlDataset:
+    def _write_jsonl(self, lines: list[dict]) -> str:
+        f = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+        )
+        for line in lines:
+            f.write(json.dumps(line) + "\n")
+        f.flush()
+        f.close()
+        return f.name
+
+    def test_loads_entries(self):
+        path = self._write_jsonl([
+            {"id": "r1", "category": "factual", "context": "c", "question": "q?",
+             "expected_response": "r", "relevant_chunk_ids": ["a"]},
+            {"id": "r2", "category": "factual", "context": "c", "question": "q?",
+             "expected_response": "r"},
+        ])
+        try:
+            entries = load_jsonl_dataset(path)
+            assert len(entries) == 2
+            assert entries[0].relevant_chunk_ids == ["a"]
+            assert entries[1].relevant_chunk_ids is None
+        finally:
+            os.unlink(path)
+
+    def test_blank_lines_skipped(self):
+        path = self._write_jsonl([
+            {"id": "r1", "category": "factual", "context": "c", "question": "q?",
+             "expected_response": "r"},
+        ])
+        # Append a blank line
+        with open(path, "a") as f:
+            f.write("\n   \n")
+        try:
+            entries = load_jsonl_dataset(path)
+            assert len(entries) == 1
+        finally:
+            os.unlink(path)
+
+    def test_missing_required_keys(self):
+        path = self._write_jsonl([{"id": "r1", "category": "factual"}])
+        try:
+            with pytest.raises(ValueError, match="Line 1: missing required"):
+                load_jsonl_dataset(path)
+        finally:
+            os.unlink(path)
+
+    def test_malformed_line(self):
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+        ) as f:
+            f.write('{"id": "r1", "category": "factual", "context": "c", '
+                    '"question": "q?", "expected_response": "r"}\n')
+            f.write("not json\n")
+            f.flush()
+            try:
+                with pytest.raises(ValueError, match="Line 2:"):
+                    load_jsonl_dataset(f.name)
+            finally:
+                os.unlink(f.name)
+
+    def test_empty_file(self):
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".jsonl", delete=False
+        ) as f:
+            f.flush()
+            try:
+                with pytest.raises(ValueError, match="empty"):
+                    load_jsonl_dataset(f.name)
+            finally:
+                os.unlink(f.name)
+
+    def test_file_not_found(self):
+        with pytest.raises(FileNotFoundError):
+            load_jsonl_dataset("/nonexistent/dataset.jsonl")
+
+
+# ---------------------------------------------------------------------------
+# v0.5.0 — _build_retrieval_adapter, _percentiles, _format_rag_system_prompt
+# ---------------------------------------------------------------------------
+
+
+class TestBuildRetrievalAdapter:
+    def test_unknown_adapter_raises(self):
+        with pytest.raises(ValueError, match="Unsupported retrieval adapter"):
+            _build_retrieval_adapter("faiss", "/some/path")
+
+
+class TestPercentiles:
+    def test_empty(self):
+        assert _percentiles([]) == (0.0, 0.0)
+
+    def test_single_value(self):
+        assert _percentiles([42.0]) == (42.0, 42.0)
+
+    def test_known_distribution(self):
+        # statistics.quantiles inclusive on [10, 20, 30, 40, 50]
+        # produces evenly-spaced cut points; just sanity-check ordering.
+        p50, p95 = _percentiles([10.0, 20.0, 30.0, 40.0, 50.0])
+        assert 25.0 <= p50 <= 35.0
+        assert p95 >= 45.0
+
+
+class TestFormatRagSystemPrompt:
+    def test_renders_chunks(self):
+        chunks = [
+            RetrievedChunk(chunk_id="c1", content="alpha", score=1.0),
+            RetrievedChunk(chunk_id="c2", content="beta", score=0.5),
+        ]
+        prompt = _format_rag_system_prompt("Original context.", chunks)
+        assert "Original context." in prompt
+        assert "[chunk 1]\nalpha" in prompt
+        assert "[chunk 2]\nbeta" in prompt
+        assert "Answer the question using only the retrieved context above." in prompt
+
+
+# ---------------------------------------------------------------------------
+# v0.5.0 — run_retrieval_evaluation
+# ---------------------------------------------------------------------------
+
+
+def _make_rag_dataset_file(entries: list[dict]) -> str:
+    f = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+    )
+    for e in entries:
+        f.write(json.dumps(e) + "\n")
+    f.flush()
+    f.close()
+    return f.name
+
+
+class _FakeAdapter:
+    """Returns canned chunks per query keyed by question text."""
+
+    def __init__(self, canned: dict[str, list[RetrievedChunk]]):
+        self.canned = canned
+        self.calls: list[tuple[str, int]] = []
+
+    def retrieve(self, query: str, k: int):
+        self.calls.append((query, k))
+        return list(self.canned.get(query, []))[:k]
+
+
+class TestRunRetrievalEvaluation:
+    def _entries(self):
+        return [
+            {"id": "q1", "category": "factual", "context": "ctx",
+             "question": "q1?", "expected_response": "r",
+             "relevant_chunk_ids": ["c1"]},
+            {"id": "q2", "category": "factual", "context": "ctx",
+             "question": "q2?", "expected_response": "r",
+             "relevant_chunk_ids": ["c2", "c3"]},
+            {"id": "skip", "category": "factual", "context": "ctx",
+             "question": "skipped?", "expected_response": "r"},
+        ]
+
+    @patch("mcp_llm_eval.engine._build_retrieval_adapter")
+    def test_happy_path_with_skipping(self, mock_build, capsys):
+        canned = {
+            "q1?": [RetrievedChunk(chunk_id="c1", content="x", score=1.0)],
+            "q2?": [
+                RetrievedChunk(chunk_id="c2", content="x", score=1.0),
+                RetrievedChunk(chunk_id="c3", content="x", score=0.5),
+            ],
+        }
+        mock_build.return_value = _FakeAdapter(canned)
+
+        path = _make_rag_dataset_file(self._entries())
+        try:
+            summary = run_retrieval_evaluation(
+                dataset_path=path, corpus_path="ignored", k=2,
+            )
+        finally:
+            os.unlink(path)
+
+        assert summary["total_queries"] == 2
+        assert summary["skipped"] == ["skip"]
+        assert summary["aggregate"]["avg_recall_at_k"] == 1.0
+        assert summary["aggregate"]["avg_precision_at_k"] == pytest.approx(0.75)
+        assert summary["overall"]["_retrieval"]["avg_recall_at_k"] == 1.0
+        # warning printed to stderr
+        err = capsys.readouterr().err
+        assert "skip" in err
+
+    @patch("mcp_llm_eval.engine._build_retrieval_adapter")
+    def test_no_relevant_entries_returns_error(self, mock_build):
+        path = _make_rag_dataset_file([
+            {"id": "x", "category": "factual", "context": "c",
+             "question": "?", "expected_response": "r"},
+        ])
+        try:
+            summary = run_retrieval_evaluation(
+                dataset_path=path, corpus_path="ignored",
+            )
+        finally:
+            os.unlink(path)
+        assert "error" in summary
+        mock_build.assert_not_called()
+
+    def test_dataset_not_found(self):
+        summary = run_retrieval_evaluation(
+            dataset_path="/nonexistent.jsonl", corpus_path="ignored",
+        )
+        assert "error" in summary
+
+    @patch("mcp_llm_eval.engine._build_retrieval_adapter")
+    def test_writes_output_files(self, mock_build):
+        canned = {
+            "q1?": [RetrievedChunk(chunk_id="c1", content="x", score=1.0)],
+        }
+        mock_build.return_value = _FakeAdapter(canned)
+        path = _make_rag_dataset_file([
+            {"id": "q1", "category": "factual", "context": "c",
+             "question": "q1?", "expected_response": "r",
+             "relevant_chunk_ids": ["c1"]},
+        ])
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                run_retrieval_evaluation(
+                    dataset_path=path, corpus_path="ignored", output_dir=tmpdir,
+                )
+                files = {f.name for f in Path(tmpdir).glob("*.json")}
+                assert any("retrieval_summary" in n for n in files)
+                assert any("retrieval_detail" in n for n in files)
+                assert "latest_retrieval_summary.json" in files
+        finally:
+            os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# v0.5.0 — run_rag_evaluation
+# ---------------------------------------------------------------------------
+
+
+class TestRunRagEvaluation:
+    def _entries(self):
+        return [
+            {"id": "q1", "category": "factual", "context": "Ctx 1.",
+             "question": "Where?", "expected_response": "Here.",
+             "relevant_chunk_ids": ["c1"]},
+        ]
+
+    def _gen_response(self):
+        return {
+            "response": "Here.",
+            "input_tokens": 100,
+            "output_tokens": 20,
+            "stop_reason": "stop",
+            "time_to_first_token_ms": 80,
+            "total_latency_ms": 400,
+        }
+
+    @patch("mcp_llm_eval.engine.judge_module")
+    @patch("mcp_llm_eval.engine._get_runner")
+    @patch("mcp_llm_eval.engine._get_client")
+    @patch("mcp_llm_eval.engine._build_retrieval_adapter")
+    def test_happy_path(
+        self, mock_build, mock_get_client, mock_get_runner, mock_judge_mod,
+    ):
+        mock_build.return_value = _FakeAdapter({
+            "Where?": [RetrievedChunk(chunk_id="c1", content="The answer is here.", score=1.0)],
+        })
+        mock_get_client.return_value = MagicMock()
+        runner_mod = MagicMock()
+        runner_mod.run.return_value = self._gen_response()
+        mock_get_runner.return_value = runner_mod
+
+        mock_judge_mod._resolve_judge_model.return_value = "gpt-4o-mini"
+        mock_judge_mod.judge_context_relevance.return_value = {
+            "score": 1.0, "reason": "good", "raw_score": 5, "judge_model": "gpt-4o-mini",
+        }
+        mock_judge_mod.judge_citation_faithfulness.return_value = {
+            "score": 0.75, "reason": "mostly", "raw_score": 4, "judge_model": "gpt-4o-mini",
+        }
+
+        path = _make_rag_dataset_file(self._entries())
+        try:
+            summary = run_rag_evaluation(
+                dataset_path=path, corpus_path="ignored",
+                models=[ModelConfig(provider="openai", model="gpt-4o-mini")],
+                k=1,
+            )
+        finally:
+            os.unlink(path)
+
+        assert summary["total_queries"] == 1
+        assert summary["total_model_runs"] == 1
+        assert summary["total_errors"] == 0
+        rag = summary["per_query"][0]
+        assert rag["answer"] == "Here."
+        assert rag["context_relevance_score"] == 1.0
+        assert rag["citation_faithfulness_score"] == 0.75
+        agg = summary["overall"]["gpt-4o-mini"]
+        assert agg["avg_recall_at_k"] == 1.0
+        assert agg["avg_context_relevance"] == 1.0
+        assert agg["avg_citation_faithfulness"] == 0.75
+
+    @patch("mcp_llm_eval.engine.judge_module")
+    @patch("mcp_llm_eval.engine._get_runner")
+    @patch("mcp_llm_eval.engine._get_client")
+    @patch("mcp_llm_eval.engine._build_retrieval_adapter")
+    def test_provider_error_captured(
+        self, mock_build, mock_get_client, mock_get_runner, mock_judge_mod,
+    ):
+        mock_build.return_value = _FakeAdapter({
+            "Where?": [RetrievedChunk(chunk_id="c1", content="x", score=1.0)],
+        })
+        mock_get_client.return_value = MagicMock()
+        runner_mod = MagicMock()
+        runner_mod.run.side_effect = RuntimeError("API error")
+        mock_get_runner.return_value = runner_mod
+        mock_judge_mod._resolve_judge_model.return_value = "gpt-4o-mini"
+        mock_judge_mod.judge_context_relevance.return_value = {
+            "score": 0.5, "reason": "ok", "raw_score": 3, "judge_model": "gpt-4o-mini",
+        }
+
+        path = _make_rag_dataset_file(self._entries())
+        try:
+            summary = run_rag_evaluation(
+                dataset_path=path, corpus_path="ignored",
+                models=[ModelConfig(provider="openai", model="gpt-4o-mini")],
+                k=1,
+            )
+        finally:
+            os.unlink(path)
+
+        assert summary["total_errors"] == 1
+        assert "generation failed" in summary["per_query"][0]["error"]
+        # errored result excluded from aggregate
+        assert summary["overall"]["gpt-4o-mini"]["runs"] == 0
+
+    @patch("mcp_llm_eval.engine._build_retrieval_adapter")
+    def test_dataset_load_error_returns_error_dict(self, mock_build):
+        summary = run_rag_evaluation(
+            dataset_path="/nonexistent.jsonl", corpus_path="ignored",
+            models=[ModelConfig(provider="openai", model="gpt-4o-mini")],
+        )
+        assert "error" in summary
+        mock_build.assert_not_called()
+
+    @patch("mcp_llm_eval.engine.judge_module")
+    @patch("mcp_llm_eval.engine._get_runner")
+    @patch("mcp_llm_eval.engine._get_client")
+    @patch("mcp_llm_eval.engine._build_retrieval_adapter")
+    def test_writes_rag_output_files(
+        self, mock_build, mock_get_client, mock_get_runner, mock_judge_mod,
+    ):
+        mock_build.return_value = _FakeAdapter({
+            "Where?": [RetrievedChunk(chunk_id="c1", content="x", score=1.0)],
+        })
+        mock_get_client.return_value = MagicMock()
+        runner_mod = MagicMock()
+        runner_mod.run.return_value = self._gen_response()
+        mock_get_runner.return_value = runner_mod
+        mock_judge_mod._resolve_judge_model.return_value = "gpt-4o-mini"
+        mock_judge_mod.judge_context_relevance.return_value = {
+            "score": 1.0, "reason": "ok", "raw_score": 5, "judge_model": "gpt-4o-mini",
+        }
+        mock_judge_mod.judge_citation_faithfulness.return_value = {
+            "score": 1.0, "reason": "ok", "raw_score": 5, "judge_model": "gpt-4o-mini",
+        }
+
+        path = _make_rag_dataset_file(self._entries())
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                run_rag_evaluation(
+                    dataset_path=path, corpus_path="ignored",
+                    models=[ModelConfig(provider="openai", model="gpt-4o-mini")],
+                    k=1, output_dir=tmpdir,
+                )
+                files = {f.name for f in Path(tmpdir).glob("*.json")}
+                assert any("rag_summary" in n for n in files)
+                assert any("rag_benchmark" in n for n in files)
+                assert "latest_rag_summary.json" in files
+        finally:
+            os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# v0.5.0 — check_retrieval_drift
+# ---------------------------------------------------------------------------
+
+
+class TestCheckRetrievalDrift:
+    def _baseline(self):
+        return {
+            "timestamp": "20260101_000000",
+            "aggregate": {
+                "avg_recall_at_k": 0.80,
+                "avg_precision_at_k": 0.60,
+                "avg_mrr": 0.75,
+                "avg_ndcg_at_k": 0.78,
+                "p95_retrieval_latency_ms": 5.0,
+            },
+        }
+
+    def test_no_regressions(self):
+        baseline = self._baseline()
+        current = {
+            "timestamp": "20260102_000000",
+            "aggregate": dict(baseline["aggregate"]),
+        }
+        result = check_retrieval_drift(baseline, current)
+        assert result["has_regressions"] is False
+        assert all(not m["regression"] for m in result["metrics"].values())
+
+    def test_quality_regression_flagged(self):
+        baseline = self._baseline()
+        current = {
+            "timestamp": "20260102_000000",
+            "aggregate": {**baseline["aggregate"], "avg_recall_at_k": 0.65},
+        }
+        result = check_retrieval_drift(baseline, current)
+        assert result["has_regressions"] is True
+        assert result["metrics"]["avg_recall_at_k"]["regression"] is True
+
+    def test_latency_regression_flagged(self):
+        baseline = self._baseline()
+        current = {
+            "timestamp": "20260102_000000",
+            "aggregate": {**baseline["aggregate"], "p95_retrieval_latency_ms": 200.0},
+        }
+        result = check_retrieval_drift(baseline, current)
+        assert result["has_regressions"] is True
+        assert result["metrics"]["p95_retrieval_latency_ms"]["regression"] is True
+
+    def test_custom_tolerance(self):
+        baseline = self._baseline()
+        # 0.04 drop with default 0.05 tolerance: not a regression.
+        current = {
+            "timestamp": "20260102_000000",
+            "aggregate": {**baseline["aggregate"], "avg_recall_at_k": 0.76},
+        }
+        loose = check_retrieval_drift(baseline, current)
+        assert loose["has_regressions"] is False
+        # Tighter tolerance flips it:
+        tight = check_retrieval_drift(baseline, current, {"recall_at_k": 0.01})
+        assert tight["has_regressions"] is True
+
+    def test_works_with_overall_block(self):
+        baseline = {
+            "timestamp": "b",
+            "overall": {"m1": {"avg_recall_at_k": 0.80, "p95_retrieval_latency_ms": 5.0}},
+        }
+        current = {
+            "timestamp": "c",
+            "overall": {"m1": {"avg_recall_at_k": 0.60, "p95_retrieval_latency_ms": 5.0}},
+        }
+        result = check_retrieval_drift(baseline, current)
+        assert result["metrics"]["avg_recall_at_k"]["regression"] is True
+
+
