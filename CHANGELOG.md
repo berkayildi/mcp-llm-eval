@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.5.1...v0.6.0) (2026-04-26)
+
+
+### Features
+
+* **eval:** add retrieval/RAG benchmark with AWS docs corpus ([42badb0](https://github.com/berkayildi/mcp-llm-eval/commit/42badb0a108a18e5e2729fa87ee562c65acffa77))
+
 ## [0.5.1](https://github.com/berkayildi/mcp-llm-eval/compare/v0.5.0...v0.5.1) (2026-04-25)
 
 
