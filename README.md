@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-> **Status:** stable. v0.5.0 published on PyPI, used in CI gates by [`mcp-content-pipeline`](https://github.com/berkayildi/mcp-content-pipeline). Live benchmarks at [llmshot.vercel.app](https://llmshot.vercel.app).
+> **Status:** stable. v0.7.0 on PyPI, used in CI gates by [`mcp-content-pipeline`](https://github.com/berkayildi/mcp-content-pipeline) and [`meeting-agent`](https://github.com/berkayildi/meeting-agent). Live benchmarks at [llmshot.vercel.app](https://llmshot.vercel.app).
 
 A local **Model Context Protocol (MCP) server** that packages LLM evaluation gates as reusable CI/CD primitives. Run datasets against multiple models, score responses with an LLM-as-judge, and enforce quality thresholds — all through MCP tools that AI agents can call.
 
@@ -27,6 +27,18 @@ There's no unit test for LLM quality. Teams ship prompt changes, swap models, or
 
 ---
 
+## Role in ecosystem
+
+mcp-llm-eval is the evaluation engine for a small ecosystem of repos:
+
+- **Producers** that consume this library: [mcp-content-pipeline](https://github.com/berkayildi/mcp-content-pipeline), [meeting-agent](https://github.com/berkayildi/meeting-agent), and this repo itself (dogfoods its own engine on a self-defined dataset)
+- **Data layer**: each producer writes benchmark JSON to [llm-benchmarks](https://github.com/berkayildi/llm-benchmarks)
+- **Visualization**: [LLMShot](https://github.com/berkayildi/llmshot) renders all three domains live at [llmshot.vercel.app](https://llmshot.vercel.app)
+
+This separation — engine here, golden datasets in the consuming repos, data and dashboard in dedicated public repos — means each producer defines its own quality bar without forking the engine.
+
+---
+
 ## Features
 
 | Tool                       | Description                                                                                                                                        |
@@ -40,7 +52,7 @@ There's no unit test for LLM quality. Teams ship prompt changes, swap models, or
 | `evaluate_retrieval`       | Run retrieval metrics (recall@k, precision@k, MRR, nDCG@k) against a labelled chunk dataset; returns per-query metrics, aggregate, p50/p95 latency |
 | `evaluate_rag_end_to_end`  | Full RAG pipeline — retrieve, generate, score with `context_relevance` and `citation_faithfulness` judges                                          |
 | `check_retrieval_drift`    | Compare two retrieval result files and flag metrics that regressed beyond tolerance                                                                |
-| `simulate_poisoned_corpus` | Reserved stub for v0.6.x — schema is stable, returns a not-implemented response today                                                              |
+| `simulate_poisoned_corpus` | Reserved stub; schema is stable today and returns a not-implemented response                                                                       |
 
 ### What it measures
 
@@ -345,7 +357,7 @@ CLI `--model` flags fully override the config's `models:` list (no merging). Fil
 | `evaluate_retrieval`       | Run retrieval metrics against a labelled dataset; returns per-query metrics, aggregate, p50/p95 latency |
 | `evaluate_rag_end_to_end`  | Retrieve + generate + judge in one call; returns per-(query, model) results plus per-model aggregates   |
 | `check_retrieval_drift`    | Compare two saved retrieval/RAG result files; flags metrics that regressed beyond tolerance             |
-| `simulate_poisoned_corpus` | Reserved stub for v0.6.x; schema is stable today and returns a not-implemented response                 |
+| `simulate_poisoned_corpus` | Reserved stub; schema is stable today and returns a not-implemented response                            |
 
 ### Pluggable retrievers
 
