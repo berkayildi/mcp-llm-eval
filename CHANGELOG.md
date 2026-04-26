@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/berkayildi/mcp-llm-eval/compare/v0.7.0...v0.7.1) (2026-04-26)
+
+
+### Documentation
+
+* **readme:** bump status to v0.7.0, add role in ecosystem section ([ca06097](https://github.com/berkayildi/mcp-llm-eval/commit/ca06097e030dd3c76814fee9fd88c2a945acf5e6))
+
 ## [0.7.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.6.0...v0.7.0) (2026-04-26)
 
 
