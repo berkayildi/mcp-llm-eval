@@ -33,8 +33,24 @@ judge:
   model: gpt-4o-mini
   temperature: 0
 
+# v0.5.0 retrieval/RAG config
+corpus: eval/retrieval_corpus.jsonl
+
+retrieval:
+  adapter: bm25
+  k: 5
+
 thresholds:
+  # generation thresholds
   avg_faithfulness: 0.80
   avg_relevance: 0.75
   p95_ttft_ms: 2000
   max_cost_per_query: 0.01
+  # retrieval / RAG thresholds
+  avg_recall_at_k: 0.70
+  avg_precision_at_k: 0.30
+  avg_mrr: 0.65
+  avg_ndcg_at_k: 0.70
+  p95_retrieval_latency_ms: 50
+  avg_context_relevance: 0.45
+  avg_citation_faithfulness: 0.75

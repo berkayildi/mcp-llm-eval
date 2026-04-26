@@ -1,4 +1,4 @@
-.PHONY: setup build start test clean e2e benchmark benchmark-copy
+.PHONY: setup build start test clean e2e benchmark benchmark-copy benchmark-retrieval benchmark-retrieval-copy
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -32,6 +32,24 @@ benchmark-copy:
 	cp eval/results/latest_summary.json ../llm-benchmarks/text-generation/eval-gates-summary.json
 	cp eval/results/$$(ls -t eval/results/*_benchmark.json | head -1 | xargs basename) ../llm-benchmarks/text-generation/eval-gates-benchmark.json
 	@echo "Copied to ../llm-benchmarks/text-generation/"
+
+benchmark-retrieval:
+	@if [ ! -f .env ]; then echo "Error: .env required with provider keys"; exit 1; fi
+	@set -a && . ./.env && set +a && uvx --with anthropic --with openai --with google-genai \
+		mcp-llm-eval evaluate-rag \
+		--dataset eval/retrieval_dataset.jsonl \
+		--corpus eval/retrieval_corpus.jsonl \
+		--config .eval-gate.yml \
+		--output-dir eval/results
+
+benchmark-retrieval-copy:
+	@if [ ! -d "../llm-benchmarks/retrieval" ]; then \
+		mkdir -p ../llm-benchmarks/retrieval; \
+		echo "Created ../llm-benchmarks/retrieval/"; \
+	fi
+	cp eval/results/latest_rag_summary.json ../llm-benchmarks/retrieval/eval-gates-rag-summary.json
+	cp $$(ls -t eval/results/*_rag_benchmark.json | head -1) ../llm-benchmarks/retrieval/eval-gates-rag-benchmark.json
+	@echo "Copied retrieval results to ../llm-benchmarks/retrieval/"
 
 clean:
 	rm -rf $(VENV) dist/ build/ *.egg-info/ src/*.egg-info/
