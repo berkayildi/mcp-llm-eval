@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.6.0...v0.7.0) (2026-04-26)
+
+
+### Features
+
+* **retrieval:** add OpenAI and Google embedding adapters ([799ea2a](https://github.com/berkayildi/mcp-llm-eval/commit/799ea2a4a25ae4a5dbff061e3c294b538e8fd3e2))
+
+
+### Bug Fixes
+
+* **cli:** handle RAG result schema in threshold check ([799ea2a](https://github.com/berkayildi/mcp-llm-eval/commit/799ea2a4a25ae4a5dbff061e3c294b538e8fd3e2))
+* **rag:** split RAG summary and benchmark output files ([799ea2a](https://github.com/berkayildi/mcp-llm-eval/commit/799ea2a4a25ae4a5dbff061e3c294b538e8fd3e2))
+
 ## [0.6.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.5.1...v0.6.0) (2026-04-26)
 
 
