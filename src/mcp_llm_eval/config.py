@@ -112,6 +112,23 @@ def _validate_config(data: dict[str, Any]) -> dict[str, Any]:
         "k": retrieval_raw.get("k", 5),
     }
 
+    # retrievers (optional, v0.7.0) — list of {name, adapter} for evaluate-rag-multi
+    retrievers_raw = data.get("retrievers")
+    if retrievers_raw is not None:
+        if not isinstance(retrievers_raw, list):
+            raise ValueError("'retrievers' must be a list of {name, adapter} mappings")
+        retrievers: list[dict[str, str]] = []
+        for i, r in enumerate(retrievers_raw):
+            if not isinstance(r, dict):
+                raise ValueError(f"retrievers[{i}] must be a mapping")
+            if "name" not in r:
+                raise ValueError(f"retrievers[{i}] missing required field 'name'")
+            retrievers.append({
+                "name": str(r["name"]),
+                "adapter": str(r.get("adapter", r["name"])),
+            })
+        config["retrievers"] = retrievers
+
     # tracing (optional)
     tracing_raw = data.get("tracing", {})
     config["tracing"] = {

@@ -430,10 +430,33 @@ def check_thresholds(summary: RunSummary, thresholds: ThresholdConfig) -> Thresh
 
 
 def _build_retrieval_adapter(adapter: str, corpus_path: str) -> RetrievalAdapter:
-    """Construct a retrieval adapter by name. Only ``bm25`` is supported in v0.5.0."""
+    """Construct a retrieval adapter by name.
+
+    v0.5.0 shipped ``bm25``; v0.7.0 added ``openai-small`` (text-embedding-3-small),
+    ``openai-large`` (text-embedding-3-large), and ``google`` (gemini-embedding-001).
+    """
     if adapter == "bm25":
         return BM25Adapter.from_jsonl(corpus_path)
+    if adapter == "openai-small":
+        from .embeddings import OpenAIEmbeddingAdapter
+        return OpenAIEmbeddingAdapter.from_jsonl(
+            corpus_path, model_name="text-embedding-3-small",
+        )
+    if adapter == "openai-large":
+        from .embeddings import OpenAIEmbeddingAdapter
+        return OpenAIEmbeddingAdapter.from_jsonl(
+            corpus_path, model_name="text-embedding-3-large",
+        )
+    if adapter == "google":
+        from .embeddings import GoogleEmbeddingAdapter
+        return GoogleEmbeddingAdapter.from_jsonl(
+            corpus_path, model_name="gemini-embedding-001",
+        )
     raise ValueError(f"Unsupported retrieval adapter: {adapter}")
+
+
+# Adapter names accepted by --adapter on the CLI.
+SUPPORTED_RETRIEVAL_ADAPTERS = ("bm25", "openai-small", "openai-large", "google")
 
 
 def load_jsonl_dataset(path: str) -> list[EvalEntry]:
@@ -835,7 +858,11 @@ def run_rag_evaluation(
     if output_dir:
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
-        summary_only = {k_: v for k_, v in summary.items() if k_ != "per_query"}
+        # Summary = aggregates only (no per-query records); benchmark = full per-query.
+        # Both `per_query` and `results` hold the same payload — drop both for the summary.
+        summary_only = {
+            k_: v for k_, v in summary.items() if k_ not in ("per_query", "results")
+        }
         benchmark = {**summary_only, "results": summary["per_query"]}
         (out / f"{timestamp}_rag_summary.json").write_text(
             json.dumps(summary_only, indent=2), encoding="utf-8"
@@ -935,6 +962,183 @@ def _run_rag_for_model(
         base.judge_model = judge_module._resolve_judge_model(judge_model)
 
     return base
+
+
+def run_rag_multi_evaluation(
+    dataset_path: str,
+    corpus_path: str,
+    models: list[ModelConfig],
+    retrievers: list[dict[str, str]],
+    k: int = 5,
+    judge_config: dict[str, Any] | None = None,
+    output_dir: str | None = None,
+) -> dict[str, Any]:
+    """Run RAG evaluation against several retrievers and merge into one summary.
+
+    ``retrievers`` is a list of ``{"name": str, "adapter": str}`` dicts. Each
+    retriever runs the full RAG pipeline (the same dataset × generation models),
+    and the merged ``overall`` block is keyed by retriever ``name`` so each row
+    shows that retriever's IR metrics (averaged over 5 gen models — IR is
+    deterministic per retriever) plus generation metrics averaged across the
+    gen models that ran behind it.
+
+    Per-retriever raw summaries are still written under their own timestamp so
+    detail is not lost.
+    """
+    if not retrievers:
+        return {"error": "no retrievers configured"}
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    per_retriever: dict[str, dict[str, Any]] = {}
+    overall: dict[str, Any] = {}
+    all_per_query: list[dict[str, Any]] = []
+
+    total_runs = 0
+    total_errors = 0
+    total_cost = 0.0
+    total_elapsed = 0.0
+    judge_model_seen: str | None = None
+
+    for retriever_cfg in retrievers:
+        name = retriever_cfg["name"]
+        adapter = retriever_cfg.get("adapter", name)
+        sub = run_rag_evaluation(
+            dataset_path=dataset_path,
+            corpus_path=corpus_path,
+            models=models,
+            k=k,
+            adapter=adapter,
+            judge_config=judge_config,
+            output_dir=output_dir,
+        )
+        if "error" in sub:
+            return {"error": f"retriever {name} failed: {sub['error']}"}
+
+        per_retriever[name] = sub
+        total_runs += sub.get("total_model_runs", 0)
+        total_errors += sub.get("total_errors", 0)
+        total_cost += sub.get("total_estimated_cost", 0.0) or 0.0
+        total_elapsed += sub.get("total_elapsed_sec", 0.0) or 0.0
+        judge_model_seen = sub.get("judge_model") or judge_model_seen
+
+        # Tag every per-query record with which adapter produced it.
+        for r in sub.get("per_query", []):
+            tagged = dict(r)
+            tagged["adapter"] = name
+            all_per_query.append(tagged)
+
+        # Build the merged-overall row for this retriever:
+        # - IR metrics taken from the first gen-model row (IR is identical across
+        #   gen models for a given retriever because retrieval runs once per
+        #   query, not per gen model).
+        # - Gen metrics averaged across all gen-model rows.
+        gen_rows = list(sub.get("overall", {}).values())
+        if not gen_rows:
+            continue
+
+        ir_keys = (
+            "avg_recall_at_k", "avg_precision_at_k", "avg_mrr", "avg_ndcg_at_k",
+            "avg_retrieval_latency_ms", "p50_retrieval_latency_ms",
+            "p95_retrieval_latency_ms",
+        )
+        gen_keys = (
+            "avg_context_relevance", "avg_citation_faithfulness",
+            "avg_ttft_ms", "avg_latency_ms", "avg_input_tokens",
+            "avg_output_tokens", "avg_cost_per_query",
+        )
+
+        def _avg(rows: list[dict[str, Any]], key: str, ndigits: int) -> float | None:
+            vals = [
+                r.get(key) for r in rows
+                if isinstance(r, dict) and r.get(key) is not None
+            ]
+            if not vals:
+                return None
+            return round(sum(vals) / len(vals), ndigits)
+
+        # Provider / display model: derive from the adapter name.
+        if adapter.startswith("openai"):
+            provider = "openai"
+            display_model = (
+                "text-embedding-3-large"
+                if adapter.endswith("large") else "text-embedding-3-small"
+            )
+        elif adapter == "google":
+            provider = "google"
+            display_model = "gemini-embedding-001"
+        elif adapter == "bm25":
+            provider = "lexical"
+            display_model = "bm25-okapi"
+        else:
+            provider = adapter
+            display_model = adapter
+
+        merged_row: dict[str, Any] = {
+            "provider": provider,
+            "model": display_model,
+            "runs": sum(int(r.get("runs", 0)) for r in gen_rows),
+            "k": k,
+            "adapter": name,
+        }
+        for key in ir_keys:
+            ndigits = 1 if "latency" in key else 4
+            merged_row[key] = _avg(gen_rows, key, ndigits) or 0.0
+        for key in gen_keys:
+            ndigits = 6 if key == "avg_cost_per_query" else (
+                1 if "latency" in key or "ttft" in key or "tokens" in key else 4
+            )
+            merged_row[key] = _avg(gen_rows, key, ndigits)
+
+        overall[name] = merged_row
+
+    by_adapter = {
+        name: {"overall": s.get("overall", {})}
+        for name, s in per_retriever.items()
+    }
+
+    summary: dict[str, Any] = {
+        "timestamp": timestamp,
+        "k": k,
+        # Single-string `adapter` retained for compat with the existing RAG schema
+        # (consumers expect this field); `adapters` carries the full list.
+        "adapter": ",".join(r["name"] for r in retrievers),
+        "adapters": [r["name"] for r in retrievers],
+        "total_queries": int(
+            per_retriever[retrievers[0]["name"]].get("total_queries", 0)
+        ) if retrievers else 0,
+        "total_questions": int(
+            per_retriever[retrievers[0]["name"]].get("total_questions", 0)
+        ) if retrievers else 0,
+        "total_model_runs": total_runs,
+        "total_errors": total_errors,
+        "total_elapsed_sec": round(total_elapsed, 1),
+        "total_estimated_cost": round(total_cost, 6),
+        "judge_model": judge_model_seen,
+        "skipped": [],
+        "overall": overall,
+        "by_category": {},
+        "by_adapter": by_adapter,
+        "per_query": all_per_query,
+    }
+
+    if output_dir:
+        out = Path(output_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        summary_only = {
+            k_: v for k_, v in summary.items() if k_ not in ("per_query", "by_adapter")
+        }
+        benchmark = {**summary_only, "by_adapter": by_adapter, "results": all_per_query}
+        (out / f"{timestamp}_embeddings_summary.json").write_text(
+            json.dumps(summary_only, indent=2), encoding="utf-8"
+        )
+        (out / f"{timestamp}_embeddings_benchmark.json").write_text(
+            json.dumps(benchmark, indent=2), encoding="utf-8"
+        )
+        (out / "latest_embeddings_summary.json").write_text(
+            json.dumps(summary_only, indent=2), encoding="utf-8"
+        )
+
+    return summary
 
 
 def check_retrieval_drift(

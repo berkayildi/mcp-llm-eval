@@ -64,3 +64,6 @@ dmypy.json
 
 # Eval results (smoke test output)
 eval/results/
+
+# Embedding cache (regenerated from corpus content hash)
+eval/.embeddings-cache/

@@ -64,7 +64,9 @@ def cli_main(argv: list[str] | None = None) -> None:
     retrieval_parser.add_argument("--corpus", required=True, help="Path to JSONL corpus")
     retrieval_parser.add_argument("--k", type=int, default=5, help="Top-k cutoff (default 5)")
     retrieval_parser.add_argument(
-        "--adapter", default="bm25", choices=["bm25"], help="Retrieval adapter",
+        "--adapter", default="bm25",
+        choices=list(engine.SUPPORTED_RETRIEVAL_ADAPTERS),
+        help="Retrieval adapter",
     )
     retrieval_parser.add_argument("--output-dir", help="Directory to save results")
     retrieval_parser.add_argument("--config", help="Path to .eval-gate.yml for threshold check")
@@ -77,7 +79,9 @@ def cli_main(argv: list[str] | None = None) -> None:
     rag_parser.add_argument("--corpus", required=True, help="Path to JSONL corpus")
     rag_parser.add_argument("--k", type=int, default=5, help="Top-k cutoff (default 5)")
     rag_parser.add_argument(
-        "--adapter", default="bm25", choices=["bm25"], help="Retrieval adapter",
+        "--adapter", default="bm25",
+        choices=list(engine.SUPPORTED_RETRIEVAL_ADAPTERS),
+        help="Retrieval adapter",
     )
     rag_parser.add_argument(
         "--model", action="append", default=None,
@@ -86,6 +90,21 @@ def cli_main(argv: list[str] | None = None) -> None:
     rag_parser.add_argument("--judge-model", help="Judge model (overrides env / default)")
     rag_parser.add_argument("--output-dir", help="Directory to save results")
     rag_parser.add_argument("--config", help="Path to .eval-gate.yml")
+
+    # evaluate-rag-multi subcommand (v0.7.0) — run several retrievers in one shot
+    rag_multi_parser = subparsers.add_parser(
+        "evaluate-rag-multi",
+        help="Run RAG eval across multiple retrievers and merge into one summary",
+    )
+    rag_multi_parser.add_argument("--dataset", required=True, help="Path to JSONL dataset")
+    rag_multi_parser.add_argument("--corpus", required=True, help="Path to JSONL corpus")
+    rag_multi_parser.add_argument("--k", type=int, default=5, help="Top-k cutoff")
+    rag_multi_parser.add_argument("--output-dir", help="Directory to save results")
+    rag_multi_parser.add_argument(
+        "--config", required=True,
+        help="Path to .eval-gate.yml with a 'retrievers:' list and 'models:' block",
+    )
+    rag_multi_parser.add_argument("--judge-model", help="Judge model override")
 
     args = parser.parse_args(argv)
 
@@ -105,6 +124,8 @@ def cli_main(argv: list[str] | None = None) -> None:
         _cmd_evaluate_retrieval(args)
     elif args.command == "evaluate-rag":
         _cmd_evaluate_rag(args)
+    elif args.command == "evaluate-rag-multi":
+        _cmd_evaluate_rag_multi(args)
 
 
 def _cmd_run(args: argparse.Namespace) -> None:
@@ -411,6 +432,89 @@ def _cmd_evaluate_rag(args: argparse.Namespace) -> None:
         _check_post_run_thresholds(args.config, summary, prefetched=config)
 
 
+def _cmd_evaluate_rag_multi(args: argparse.Namespace) -> None:
+    """Execute the evaluate-rag-multi subcommand."""
+    try:
+        config = load_config(args.config)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    retrievers = config.get("retrievers")
+    if not retrievers:
+        print(
+            "Error: --config must contain a 'retrievers:' list of {name, adapter}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    models_raw = config.get("models")
+    if not models_raw:
+        print("Error: --config must contain a 'models:' block", file=sys.stderr)
+        sys.exit(1)
+
+    output_dir = args.output_dir or config.get("output_dir", "eval/results")
+
+    judge_config = dict(config.get("judge", {}))
+    if args.judge_model:
+        judge_config["model"] = args.judge_model
+
+    model_configs = [ModelConfig.from_dict(m) for m in models_raw]
+
+    summary = engine.run_rag_multi_evaluation(
+        dataset_path=args.dataset,
+        corpus_path=args.corpus,
+        models=model_configs,
+        retrievers=retrievers,
+        k=args.k,
+        judge_config=judge_config or None,
+        output_dir=output_dir,
+    )
+
+    if "error" in summary:
+        print(f"Error: {summary['error']}", file=sys.stderr)
+        sys.exit(1)
+
+    _print_rag_multi_table(summary)
+
+    if config.get("thresholds"):
+        _check_post_run_thresholds(args.config, summary, prefetched=config)
+
+
+def _print_rag_multi_table(summary: dict[str, Any]) -> None:
+    print(f"\nRAG-multi evaluation: {summary.get('timestamp')}")
+    print(
+        f"Adapters: {', '.join(summary.get('adapters', []))} | "
+        f"Runs: {summary.get('total_model_runs')} | "
+        f"Errors: {summary.get('total_errors', 0)} | "
+        f"Cost: ${summary.get('total_estimated_cost', 0.0):.4f}"
+    )
+    print()
+    overall = summary.get("overall", {})
+    if not overall:
+        return
+    print(
+        f"{'Adapter':<18} {'recall@k':>9} {'mrr':>7} {'ndcg@k':>8} "
+        f"{'ctx_rel':>8} {'cite':>7} {'p95 ms':>8} {'cost':>9}"
+    )
+    print("-" * 84)
+    for name, m in overall.items():
+        def fmt(v: Any, width: int, prec: int = 4) -> str:
+            if v is None:
+                return f"{'N/A':>{width}}"
+            return f"{v:>{width}.{prec}f}"
+        print(
+            f"{name:<18} "
+            f"{fmt(m.get('avg_recall_at_k'), 9)} "
+            f"{fmt(m.get('avg_mrr'), 7)} "
+            f"{fmt(m.get('avg_ndcg_at_k'), 8)} "
+            f"{fmt(m.get('avg_context_relevance'), 8)} "
+            f"{fmt(m.get('avg_citation_faithfulness'), 7)} "
+            f"{fmt(m.get('p95_retrieval_latency_ms'), 8, 1)} "
+            f"{fmt(m.get('avg_cost_per_query'), 9, 4)}"
+        )
+
+
 def _print_retrieval_table(summary: dict[str, Any]) -> None:
     agg = summary.get("aggregate", {})
     k = summary.get("k")
@@ -489,6 +593,19 @@ def _check_post_run_thresholds(
     if not any(v is not None for v in thresholds_dict.values()):
         return
     thresholds = ThresholdConfig.from_dict(thresholds_dict)
+
+    # RAG / retrieval-only summaries carry per-query records keyed by `query_id`
+    # plus `retrieval_metrics`, which can't be coerced to EvalResult. The retrieval
+    # threshold checks only consume the `overall` aggregate block, so dropping the
+    # results array here is safe and avoids a KeyError in EvalResult.from_dict.
+    results = summary.get("results") or []
+    is_rag_shape = bool(results) and any(
+        isinstance(r, dict) and ("retrieval_metrics" in r or "query_id" in r)
+        for r in results
+    )
+    if is_rag_shape:
+        summary = {**summary, "results": []}
+
     rs = RunSummary.from_dict(summary)
     result = engine.check_thresholds(rs, thresholds)
     for check in result.per_metric:

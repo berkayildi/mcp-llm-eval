@@ -349,7 +349,16 @@ CLI `--model` flags fully override the config's `models:` list (no merging). Fil
 
 ### Pluggable retrievers
 
-v0.5.0 ships an in-memory `BM25Adapter` (via `rank_bm25`) — zero API cost, deterministic, fits unit tests. The `RetrievalAdapter` Protocol is a single sync method (`retrieve(query, k) -> list[RetrievedChunk]`), so additional adapters (Azure AI Search, OpenSearch, Pinecone, your own) drop in as a class without schema or threshold changes.
+v0.5.0 shipped an in-memory `BM25Adapter` (via `rank_bm25`); v0.7.0 adds three embedding-based adapters. All implement the same `RetrievalAdapter` Protocol — a single sync method `retrieve(query, k) -> list[RetrievedChunk]` — so they're interchangeable behind `--adapter` and the eval-gate thresholds.
+
+| Adapter         | Backing model              | Cost        | Notes                                                                       |
+| --------------- | -------------------------- | ----------- | --------------------------------------------------------------------------- |
+| `bm25`          | `rank_bm25` Okapi          | $0          | Lexical keyword match. Deterministic, model-agnostic, fits unit tests.      |
+| `openai-small`  | `text-embedding-3-small`   | ~$0.02/1M   | Cheap dense vectors; corpus embeddings cached to `.embeddings-cache/`.      |
+| `openai-large`  | `text-embedding-3-large`   | ~$0.13/1M   | Higher-quality dense vectors; same cache layout as `openai-small`.          |
+| `google`        | `gemini-embedding-001`     | ~$0.15/1M   | Google's first-party embeddings. Batches automatically (100 inputs / req).  |
+
+Embedding adapters lazy-import `openai` / `google-genai` / `numpy`. Install via `pip install "mcp-llm-eval[embeddings]"` to pull all three. Plug your own (Azure AI Search, OpenSearch, Pinecone) by subclassing the protocol; no schema or threshold changes required.
 
 ---
 

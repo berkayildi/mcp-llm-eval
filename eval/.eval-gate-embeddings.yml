@@ -1,0 +1,59 @@
+dataset: eval/retrieval_dataset.jsonl
+output_dir: eval/results
+corpus: eval/retrieval_corpus.jsonl
+
+retrievers:
+  - name: openai-small
+    adapter: openai-small
+  - name: openai-large
+    adapter: openai-large
+  - name: google
+    adapter: google
+
+models:
+  - provider: anthropic
+    model: claude-sonnet-4-6
+    max_tokens: 2048
+    input_cost_per_mtok: 3.0
+    output_cost_per_mtok: 15.0
+  - provider: anthropic
+    model: claude-haiku-4-5-20251001
+    max_tokens: 2048
+    input_cost_per_mtok: 1.0
+    output_cost_per_mtok: 5.0
+  - provider: openai
+    model: gpt-4o-mini
+    max_tokens: 2048
+    input_cost_per_mtok: 0.15
+    output_cost_per_mtok: 0.60
+  - provider: google
+    model: gemini-2.5-flash
+    max_tokens: 2048
+    input_cost_per_mtok: 0.15
+    output_cost_per_mtok: 0.60
+  - provider: google
+    model: gemini-2.5-flash-lite
+    max_tokens: 2048
+    input_cost_per_mtok: 0.075
+    output_cost_per_mtok: 0.30
+
+judge:
+  provider: openai
+  model: gpt-4o-mini
+  temperature: 0
+
+retrieval:
+  k: 5
+
+# Calibrated against the first multi-retriever run (2026-04-26): observed
+# recall@5 0.82-0.92, MRR ~0.92, nDCG@5 0.82-0.89, context_relevance 0.48-0.54,
+# citation_faithfulness 0.99-1.00, p95 retrieval latency 413-574ms.
+# avg_context_relevance kept at 0.45 to match the BM25 baseline — the gpt-4o-mini
+# judge is conservative on this metric and tightening it produced a noisy gate.
+thresholds:
+  avg_recall_at_k: 0.75
+  avg_mrr: 0.85
+  avg_ndcg_at_k: 0.75
+  avg_context_relevance: 0.45
+  avg_citation_faithfulness: 0.90
+  p95_retrieval_latency_ms: 600

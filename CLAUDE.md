@@ -29,6 +29,9 @@ mcp-llm-eval/
 │       │   ├── openai.py        # Streaming runner for OpenAI (chat.completions.create stream)
 │       │   └── google.py        # Streaming runner for Google GenAI (generate_content_stream)
 │       ├── judge.py             # LLM-as-judge scorer (faithfulness + relevance, 0-1 scale)
+│       ├── retrieval.py         # RetrievalAdapter protocol + BM25Adapter
+│       ├── retrieval_metrics.py # IR metrics (recall@k, precision@k, MRR, nDCG@k)
+│       ├── embeddings.py        # OpenAIEmbeddingAdapter + GoogleEmbeddingAdapter (v0.7.0)
 │       └── types.py             # Shared dataclasses: EvalEntry, EvalResult, RunSummary, ThresholdConfig
 ├── tests/
 │   ├── __init__.py
@@ -115,6 +118,19 @@ The `mcp-llm-eval` entry point routes based on CLI arguments:
    - `run(client, model, system_prompt, question, max_tokens)` function that returns a dict with: `response`, `input_tokens`, `output_tokens`, `stop_reason`, `time_to_first_token_ms`, `total_latency_ms`
 2. Register the provider in `engine.py` `_get_runner()` and `_get_client()` functions.
 3. Add tests in `tests/test_providers.py` with a mocked SDK client.
+
+---
+
+## Adding a new retrieval adapter
+
+Available out of the box: `bm25` (lexical, rank_bm25), `openai-small` (text-embedding-3-small), `openai-large` (text-embedding-3-large), `google` (gemini-embedding-001). Embedding adapters share `_BaseEmbeddingAdapter` in `embeddings.py`, which handles corpus validation, cosine retrieval, and on-disk caching at `{corpus_dir}/.embeddings-cache/{name}-{model}-{hash}.npz`.
+
+To add a new one (e.g., Cohere, OpenSearch):
+
+1. For another embedding provider: subclass `_BaseEmbeddingAdapter` in `embeddings.py`, implement `_build_client()` and `_embed_batch(texts)`. Set `_adapter_name` and `_default_batch_size` (Google's batch limit is 100; OpenAI's is ~2048).
+2. For a non-embedding store (BM25-style or external service): implement the `RetrievalAdapter` Protocol directly — a class with `retrieve(query, k) -> list[RetrievedChunk]` and a `from_jsonl(path)` classmethod.
+3. Register the adapter name in `engine._build_retrieval_adapter()` and append it to `engine.SUPPORTED_RETRIEVAL_ADAPTERS`.
+4. Add tests in `tests/test_embeddings.py` (or `test_retrieval.py`) with a mocked SDK; never make real API calls in tests.
 
 ---
 

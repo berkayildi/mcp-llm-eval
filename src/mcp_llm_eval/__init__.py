@@ -1,3 +1,3 @@
 """MCP server that packages LLM evaluation gates as reusable CI/CD primitives."""
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"

@@ -1,4 +1,4 @@
-.PHONY: setup build start test clean e2e benchmark benchmark-copy benchmark-retrieval benchmark-retrieval-copy
+.PHONY: setup build start test clean e2e benchmark benchmark-copy benchmark-retrieval benchmark-retrieval-copy benchmark-embeddings benchmark-embeddings-copy
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -50,6 +50,23 @@ benchmark-retrieval-copy:
 	cp eval/results/latest_rag_summary.json ../llm-benchmarks/retrieval/eval-gates-rag-summary.json
 	cp $$(ls -t eval/results/*_rag_benchmark.json | head -1) ../llm-benchmarks/retrieval/eval-gates-rag-benchmark.json
 	@echo "Copied retrieval results to ../llm-benchmarks/retrieval/"
+
+benchmark-embeddings:
+	@if [ ! -f .env ]; then echo "Error: .env required with provider keys"; exit 1; fi
+	@set -a && . ./.env && set +a && uvx --with anthropic --with openai --with google-genai --with numpy \
+		mcp-llm-eval evaluate-rag-multi \
+		--dataset eval/retrieval_dataset.jsonl \
+		--corpus eval/retrieval_corpus.jsonl \
+		--config eval/.eval-gate-embeddings.yml \
+		--output-dir eval/results
+
+benchmark-embeddings-copy:
+	@if [ ! -d "../llm-benchmarks/retrieval" ]; then \
+		echo "Error: ../llm-benchmarks/retrieval not found"; exit 1; \
+	fi
+	cp eval/results/latest_embeddings_summary.json ../llm-benchmarks/retrieval/embeddings-summary.json
+	cp $$(ls -t eval/results/*_embeddings_benchmark.json | head -1) ../llm-benchmarks/retrieval/embeddings-benchmark.json
+	@echo "Copied embeddings results to ../llm-benchmarks/retrieval/"
 
 clean:
 	rm -rf $(VENV) dist/ build/ *.egg-info/ src/*.egg-info/
