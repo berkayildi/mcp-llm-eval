@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.8.0...v0.9.0) (2026-04-28)
+
+
+### Features
+
+* **eval:** expand reasoning category to 10 questions for statistical separation ([ea4d8bb](https://github.com/berkayildi/mcp-llm-eval/commit/ea4d8bb8afdc04d15bd09c6fa9ef373f3ca96372))
+
 ## [0.8.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.7.1...v0.8.0) (2026-04-28)
 
 
