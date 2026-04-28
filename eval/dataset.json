@@ -70,5 +70,93 @@
     "question": "Summarize the three contributing factors to the outage.",
     "expected_response": "Three factors contributed: a misconfigured load balancer sent all traffic to one availability zone, the on-call runbook referenced a decommissioned dashboard, and alerting thresholds had been silenced two weeks earlier and never re-enabled.",
     "tags": ["summarization", "engineering"]
+  },
+  {
+    "id": "smoke_factual_004",
+    "category": "factual",
+    "context": "The Bank of England Monetary Policy Committee voted 7-2 to hold the base rate at 4.25% in March 2026. Two members voted for a 25 basis point cut, citing slowing wage growth. The minutes noted that services inflation remained sticky at 4.8%, while goods inflation had fallen to 1.2%. The committee's next decision is scheduled for May 2026.",
+    "question": "What was the vote split on the Bank of England's March 2026 rate decision?",
+    "expected_response": "The Bank of England Monetary Policy Committee voted 7-2 to hold the base rate, with two members voting for a 25 basis point cut.",
+    "tags": ["factual", "finance"]
+  },
+  {
+    "id": "smoke_factual_005",
+    "category": "factual",
+    "context": "GDPR Article 17, also known as the Right to Erasure, allows EU data subjects to request deletion of their personal data under specific conditions. The right applies when data is no longer necessary for its original purpose, when consent is withdrawn, or when data has been unlawfully processed. Controllers must respond within one month of the request. The right is not absolute and can be overridden by legal obligations or public interest grounds.",
+    "question": "Within what timeframe must a data controller respond to a GDPR Article 17 erasure request?",
+    "expected_response": "A data controller must respond to a GDPR Article 17 erasure request within one month.",
+    "tags": ["factual", "policy"]
+  },
+  {
+    "id": "smoke_reasoning_004",
+    "category": "reasoning",
+    "context": "A RAG pipeline shows 92% recall@5 in dev evals but customers report missing answers in production. Logs show retrieval p95 latency has crept from 200ms to 1800ms over 3 months. CPU and memory usage are unchanged. The corpus has grown from 5,000 to 80,000 chunks during this period.",
+    "question": "What is the most likely root cause of the production retrieval issues?",
+    "expected_response": "The corpus growth from 5,000 to 80,000 chunks has degraded vector index performance. Recall is still high in dev because the test set is small, but production queries hit a saturated index. The fix is rebuilding or sharding the index, not changing the embedding model.",
+    "tags": ["reasoning", "engineering"]
+  },
+  {
+    "id": "smoke_reasoning_005",
+    "category": "reasoning",
+    "context": "A startup spends $12k per month on GPT-4o for a customer support chatbot processing 50,000 queries per day. Average prompt is 800 tokens, response is 200 tokens. They want to cut cost by 60% without sacrificing quality on common queries. Customer support queries have a 70% repetition rate.",
+    "question": "What is the most cost-effective first action to take?",
+    "expected_response": "Implement query caching first. With 70% query repetition, caching cuts API calls by approximately 70%, saving around $8.4k per month. This is cheaper and faster than switching models, and quality is preserved on cached responses.",
+    "tags": ["reasoning", "finance"]
+  },
+  {
+    "id": "smoke_reasoning_006",
+    "category": "reasoning",
+    "context": "A company built its core product on Anthropic's Claude API exclusively for the past 18 months. The CTO is debating whether to add a second LLM provider for resilience. Switching cost is estimated at 6 weeks of engineering time. Anthropic's measured uptime over the past year is 99.7%.",
+    "question": "What is the strongest argument against adding a second provider now?",
+    "expected_response": "The 6-week switching cost is concrete and immediate, while 99.7% uptime translates to about 26 hours of yearly downtime, most of which is recoverable through retries. The engineering capacity is better spent on revenue-generating features unless uptime drops or business stakes increase.",
+    "tags": ["reasoning", "tradeoff"]
+  },
+  {
+    "id": "smoke_reasoning_007",
+    "category": "reasoning",
+    "context": "An eval gate has a faithfulness threshold of 0.85 that has blocked PRs for the past week. The judge model gpt-4o-mini consistently scores responses 0.83-0.84, even on responses that human reviewers rate as faithful. No recent changes were made to prompts or the target model.",
+    "question": "What is the correct first action?",
+    "expected_response": "Spot-check 10 flagged PRs against human judgment. If humans confirm the responses are faithful, the threshold is too strict for this judge model and should be lowered to 0.80 with documented reasoning. If humans agree with the judge, the actual model output has degraded and needs investigation.",
+    "tags": ["reasoning", "engineering"]
+  },
+  {
+    "id": "smoke_reasoning_008",
+    "category": "reasoning",
+    "context": "A team is choosing a chunking strategy for a 50,000-document compliance corpus containing FCA regulations, audit trails, and policy memos. Option A uses fixed 512-token chunks with 50-token overlap. Option B uses hierarchical chunking that respects section, subsection, and clause boundaries.",
+    "question": "Which strategy is better suited to this corpus and why?",
+    "expected_response": "Hierarchical chunking. Compliance documents have rigid structural hierarchy that maps directly to how readers and auditors navigate them. Fixed-size chunks risk splitting a single regulatory clause across two chunks, breaking citation faithfulness. Hierarchical preserves the legal structure that compliance audits depend on.",
+    "tags": ["reasoning", "engineering"]
+  },
+  {
+    "id": "smoke_reasoning_009",
+    "category": "reasoning",
+    "context": "A SaaS company has two pricing tiers. Pro is $29 per month with a 60% gross margin. Enterprise is $499 per month with a 40% gross margin. Customer acquisition cost is $200 for Pro and $5,000 for Enterprise. Pro customers churn at 8% monthly. Enterprise customers churn at 1.5% monthly.",
+    "question": "Which tier has the better unit economics over a 24-month horizon?",
+    "expected_response": "Enterprise has better unit economics. Pro has expected revenue of about $362 over the horizon (with 60% margin: $217), well below the $200 CAC payback. Enterprise expected revenue is about $11,976 (with 40% margin: $4,790), comfortably below the $5,000 CAC. Lower churn compounds the advantage.",
+    "tags": ["reasoning", "finance"]
+  },
+  {
+    "id": "smoke_reasoning_010",
+    "category": "reasoning",
+    "context": "A team is comparing two LLM evaluation strategies for CI gates. Strategy A runs a 50-question benchmark on every PR (cost $2 per PR, takes 8 minutes). Strategy B runs a 10-question smoke test on every PR plus a 200-question full benchmark nightly on main (cost $0.40 per PR plus $4 per night). The repo averages 30 PRs per day.",
+    "question": "Which strategy has better cost-effectiveness for catching regressions?",
+    "expected_response": "Strategy B is more cost-effective. Daily cost: 30 PRs times $0.40 plus $4 nightly equals $16, versus Strategy A's $60. Strategy B catches obvious regressions on every PR via smoke tests and detects subtle regressions in the comprehensive nightly run. The 8-minute Strategy A blocks every PR unnecessarily.",
+    "tags": ["reasoning", "tradeoff"]
+  },
+  {
+    "id": "smoke_summarization_004",
+    "category": "summarization",
+    "context": "The mcp-llm-eval v0.7.0 release added three embedding adapters for retrieval evaluation: OpenAI text-embedding-3-small, OpenAI text-embedding-3-large, and Google gemini-embedding-001. The release also fixed two bugs from the v0.5.1 audit: byte-identical RAG summary and benchmark output files, and a CLI threshold check that crashed on RAG result schemas. 21 new tests were added, bringing the total to 454 passing tests. Anthropic was excluded from the embedding matrix because they do not publish a public embeddings API.",
+    "question": "Summarize the v0.7.0 release.",
+    "expected_response": "v0.7.0 added three embedding adapters (OpenAI small, OpenAI large, Google gemini-embedding-001), fixed two RAG output bugs from the v0.5.1 audit, and added 21 tests for a total of 454. Anthropic was excluded due to no public embeddings API.",
+    "tags": ["summarization", "engineering"]
+  },
+  {
+    "id": "smoke_summarization_005",
+    "category": "summarization",
+    "context": "The Q1 2026 board update covered four items. Annual recurring revenue grew 38% year-over-year to $4.2 million. Two enterprise customers were lost during the quarter due to procurement delays. The product team shipped a new RAG evaluation feature that increased customer adoption by 15%. The board approved a $2 million Series A bridge round at a $40 million valuation, with closing expected in May.",
+    "question": "Summarize the four items from the Q1 2026 board update.",
+    "expected_response": "Four items: ARR grew 38% YoY to $4.2M, two enterprise customers were lost to procurement delays, a new RAG evaluation feature drove 15% adoption growth, and the board approved a $2M Series A bridge at a $40M valuation closing in May.",
+    "tags": ["summarization", "finance"]
   }
 ]
