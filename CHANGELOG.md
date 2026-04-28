@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.7.1...v0.8.0) (2026-04-28)
+
+
+### Features
+
+* **eval:** expand benchmark matrix with frontier models ([c63d46e](https://github.com/berkayildi/mcp-llm-eval/commit/c63d46e6df2364ef8c4a5b1b5141bf0930310cda))
+
+
+### Bug Fixes
+
+* **providers:** use max_completion_tokens for OpenAI to support gpt-5.x reasoning models ([c63d46e](https://github.com/berkayildi/mcp-llm-eval/commit/c63d46e6df2364ef8c4a5b1b5141bf0930310cda))
+
 ## [0.7.1](https://github.com/berkayildi/mcp-llm-eval/compare/v0.7.0...v0.7.1) (2026-04-26)
 
 
