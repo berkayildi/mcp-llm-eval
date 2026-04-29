@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/berkayildi/mcp-llm-eval/compare/v0.9.0...v0.9.1) (2026-04-29)
+
+
+### Documentation
+
+* **readme:** replace static version pins with PyPI badges, update model counts ([fe1f716](https://github.com/berkayildi/mcp-llm-eval/commit/fe1f71688c8f0e3f687eaa2cfa12ba9060e24ce2))
+
 ## [0.9.0](https://github.com/berkayildi/mcp-llm-eval/compare/v0.8.0...v0.9.0) (2026-04-28)
 
 
