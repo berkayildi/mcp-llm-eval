@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-> **Status:** stable. v0.7.0 on PyPI, used in CI gates by [`mcp-content-pipeline`](https://github.com/berkayildi/mcp-content-pipeline) and [`meeting-agent`](https://github.com/berkayildi/meeting-agent). Live benchmarks at [llmshot.vercel.app](https://llmshot.vercel.app).
+> **Status:** stable. Used in CI gates by [`mcp-content-pipeline`](https://github.com/berkayildi/mcp-content-pipeline) and [`meeting-agent`](https://github.com/berkayildi/meeting-agent). Live benchmarks at [llmshot.vercel.app](https://llmshot.vercel.app).
 
 A local **Model Context Protocol (MCP) server** that packages LLM evaluation gates as reusable CI/CD primitives. Run datasets against multiple models, score responses with an LLM-as-judge, and enforce quality thresholds — all through MCP tools that AI agents can call.
 
@@ -202,7 +202,7 @@ Threshold check:
 
 Overall: PASS
 
-> Full benchmark across 5 models lives at https://llmshot.vercel.app (Eval Gates dataset).
+> Full benchmark across 8 models lives at https://llmshot.vercel.app (Eval Gates dataset).
 ```
 
 ---
@@ -446,7 +446,7 @@ jobs:
 ## Running benchmarks locally
 
 mcp-llm-eval's own dataset (`eval/dataset.json`) dogfoods the
-evaluation engine across 5 models, 9 questions, 3 categories
+evaluation engine across 8 models, 20 questions, 3 categories
 (factual, reasoning, summarization). The results feed into
 [LLMShot](https://llmshot.vercel.app) as the Eval Gates benchmark.
 
@@ -462,7 +462,7 @@ GOOGLE_API_KEY=AIza...
 Then run:
 
 ```bash
-make benchmark        # Run eval against all 5 models
+make benchmark        # Run eval against all 8 models
 make benchmark-copy   # Copy results to llm-benchmarks repo
 ```
 
