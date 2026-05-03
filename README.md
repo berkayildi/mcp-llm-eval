@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-> **Status:** stable. Used in CI gates by [`mcp-content-pipeline`](https://github.com/berkayildi/mcp-content-pipeline) and [`meeting-agent`](https://github.com/berkayildi/meeting-agent). Live benchmarks at [llmshot.vercel.app](https://llmshot.vercel.app).
+> **Status:** stable. Used in CI gates by [`mcp-content-pipeline`](https://github.com/berkayildi/mcp-content-pipeline). Live benchmarks at [llmshot.vercel.app](https://llmshot.vercel.app).
 
 A local **Model Context Protocol (MCP) server** that packages LLM evaluation gates as reusable CI/CD primitives. Run datasets against multiple models, score responses with an LLM-as-judge, and enforce quality thresholds — all through MCP tools that AI agents can call.
 
@@ -31,7 +31,7 @@ There's no unit test for LLM quality. Teams ship prompt changes, swap models, or
 
 mcp-llm-eval is the evaluation engine for a small ecosystem of repos:
 
-- **Producers** that consume this library: [mcp-content-pipeline](https://github.com/berkayildi/mcp-content-pipeline), [meeting-agent](https://github.com/berkayildi/meeting-agent), and this repo itself (dogfoods its own engine on a self-defined dataset)
+- **Producers** that consume this library: [mcp-content-pipeline](https://github.com/berkayildi/mcp-content-pipeline) and this repo itself (dogfoods its own engine on a self-defined dataset)
 - **Data layer**: each producer writes benchmark JSON to [llm-benchmarks](https://github.com/berkayildi/llm-benchmarks)
 - **Visualization**: [LLMShot](https://github.com/berkayildi/llmshot) renders all three domains live at [llmshot.vercel.app](https://llmshot.vercel.app)
 
