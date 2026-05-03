@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/berkayildi/mcp-llm-eval/compare/v0.9.1...v0.9.2) (2026-05-03)
+
+
+### Documentation
+
+* remove references to private internal consumer ([65f7936](https://github.com/berkayildi/mcp-llm-eval/commit/65f7936241d1635234fa6514e4d2c5b143a16ed3))
+
 ## [0.9.1](https://github.com/berkayildi/mcp-llm-eval/compare/v0.9.0...v0.9.1) (2026-04-29)
 
 
