@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.3](https://github.com/berkayildi/mcp-llm-eval/compare/v0.9.2...v0.9.3) (2026-11-03)
+
+
+### Bug Fixes
+
+* load env and pin mcp ([#18](https://github.com/berkayildi/mcp-llm-eval/issues/18)) ([2155e85](https://github.com/berkayildi/mcp-llm-eval/commit/2155e856d2c1b674e5c33bdae845ab88c6156fe7))
+
+
+### Documentation
+
+* remove aws and tfstate mcps ([#16](https://github.com/berkayildi/mcp-llm-eval/issues/16)) ([223579f](https://github.com/berkayildi/mcp-llm-eval/commit/223579fe546637a0021e1eeb1401ecc2a84d1241))
+
 ## [0.9.2](https://github.com/berkayildi/mcp-llm-eval/compare/v0.9.1...v0.9.2) (2026-05-03)
 
 
