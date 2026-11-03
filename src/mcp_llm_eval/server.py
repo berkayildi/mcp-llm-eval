@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import mcp.types as types
+from dotenv import load_dotenv
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
@@ -12,6 +13,8 @@ from . import engine
 from .comparison import compare_runs
 from .formatter import format_pr_comment
 from .types import ModelConfig, RunSummary, ThresholdConfig
+
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 app = Server("mcp-llm-eval")
 
