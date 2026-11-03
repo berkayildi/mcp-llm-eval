@@ -67,7 +67,7 @@ mcp-llm-eval/
 
 2. **No LangChain dependency** — The project deliberately avoids LangChain. `langsmith` SDK is only used for optional tracing and is not a dependency.
 
-3. **Single-responsibility modules** — Logic is split across focused files: `types.py` (dataclasses), `engine.py` (orchestration), `judge.py` (scoring), `providers/` (LLM runners), `server.py` (MCP tool registration). This is different from mcp-tfstate-reader's single-file approach because eval has more moving parts.
+3. **Single-responsibility modules** — Eval has many moving parts, so logic is split across focused files: `types.py` (dataclasses), `engine.py` (orchestration), `judge.py` (scoring), `providers/` (LLM runners), `server.py` (MCP tool registration).
 
 4. **Private helpers are directly importable in tests** — Test files import `_aggregate`, `_get_runner`, `load_dataset`, etc. directly. Keep helper functions at module level so tests can access them.
 
